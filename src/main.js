@@ -176,6 +176,13 @@ document.getElementById('btn-update').addEventListener('click', async () => {
     btn.textContent = 'Updating…';
 
     try {
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        if (isAndroid) {
+            window.location.href = pendingUpdate.download_url;
+            btn.textContent = 'Downloading…';
+            return;
+        }
+
         await invoke('download_and_install_update', {
             downloadUrl: pendingUpdate.download_url,
             assetName: pendingUpdate.asset_name,
