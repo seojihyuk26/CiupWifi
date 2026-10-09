@@ -56,7 +56,7 @@ Descarga la versión para tu dispositivo desde la **[Página de versiones en Git
 | **PC con Windows** | `CiupWifi_x.x.x_x64-setup.exe` | Descarga, haz doble clic para instalar y ábrelo. |
 | **Mac (Apple)** | `CiupWifi_x.x.x_universal.dmg` | Abre el archivo y arrastra `CiupWifi` a la carpeta Aplicaciones.<br>*(Si aparece aviso de seguridad: clic derecho > **Abrir**)* |
 | **Móvil Android** | `CiupWifi.apk` | Descarga e instala el archivo APK en tu teléfono. |
-| **iPhone / iPad** | [`wifiLogin.js`](wifiLogin.js) (Script) | Instala [Orion Browser](https://kagi.com/orion/) o la extensión [Userscripts para Safari](https://apps.apple.com/app/userscripts/id1463298887) y añade el script `wifiLogin.js`. |
+| **iPhone / iPad** | [**Greasy Fork (Instalación en 1 clic)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Instala mediante [Userscripts para Safari](https://apps.apple.com/app/userscripts/id1463298887) u [Orion Browser](https://kagi.com/orion/). Admite instalación y actualizaciones automáticas. |
 
 ---
 

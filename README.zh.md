@@ -50,7 +50,7 @@
 | **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (或 `.msi`) | 标准 Windows 安装包，可在开始菜单启动。 |
 | **macOS** | `CiupWifi_x.x.x_universal.dmg` | 将 `CiupWifi.app` 拖入 Applications 目录。<br>*(若出现安全提示：右键点击图标 > 选择 **打开**)* |
 | **Android** | `CiupWifi.apk` | 适用于安卓设备的独立 APK 安装包。 |
-| **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (脚本) | 可在 iOS 上通过 [Orion Browser](https://kagi.com/orion/) 或 Safari [Userscripts 扩展](https://apps.apple.com/app/userscripts/id1463298887) 运行 `wifiLogin.js`。 |
+| **iOS / iPadOS** | [**Greasy Fork (一键安装)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | 可在 iOS 上通过 Safari [Userscripts 扩展](https://apps.apple.com/app/userscripts/id1463298887) 或 [Orion Browser](https://kagi.com/orion/) 一键安装并支持自动更新。 |
 
 ---
 

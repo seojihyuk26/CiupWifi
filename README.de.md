@@ -50,7 +50,7 @@ Offizielle Pakete finden Sie auf der **[Releases-Seite](https://github.com/seoji
 | **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (oder `.msi`) | Standard-Installationsdatei für Windows. |
 | **macOS** | `CiupWifi_x.x.x_universal.dmg` | `CiupWifi.app` in den Programme-Ordner ziehen.<br>*(Bei Gatekeeper-Meldung: Rechtsklick > **Öffnen**)* |
 | **Android** | `CiupWifi.apk` | Eigenständiges APK-Paket für Android-Geräte. |
-| **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (Userscript) | Über [Orion Browser](https://kagi.com/orion/) oder die Safari-Erweiterung [Userscripts](https://apps.apple.com/app/userscripts/id1463298887) nutzbar. |
+| **iOS / iPadOS** | [**Greasy Fork (1-Klick-Installation)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Über [Userscripts für Safari](https://apps.apple.com/app/userscripts/id1463298887) oder [Orion Browser](https://kagi.com/orion/) mit 1-Klick-Installation und automatischen Updates nutzbar. |
 
 ---
 

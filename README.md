@@ -37,7 +37,7 @@ The campus Wi-Fi network at CIUP (**WifiCity**) enforces periodic captive portal
 
 1. Connect your device to the **WifiCity** Wi-Fi network.
 2. Launch **CiupWifi**, enter your campus credentials, and click **Connect**.
-3. Close the window. The application continues running in the background/system tray and handles all subsequent logins and renewals automatically.
+3. You can close the window (`[X]`) immediately! The app automatically registers background renewal with your OS (Windows Task Scheduler / macOS LaunchAgent), renewing connectivity silently without eating memory.
 
 ---
 
@@ -50,7 +50,7 @@ Official binary packages are available on the **[Releases](https://github.com/se
 | **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (or `.msi`) | Standard Windows installer.<br>*(If SmartScreen prompt appears: click **More info** > **Run anyway**)* |
 | **macOS** | `CiupWifi_x.x.x_universal.dmg` | Drag `CiupWifi.app` to Applications.<br>*(On Gatekeeper prompt: right-click > **Open**)* |
 | **Android** | `CiupWifi.apk` | Signed APK package for Android devices. |
-| **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (Userscript) | Run via [Orion Browser](https://kagi.com/orion/) or [Userscripts for Safari](https://apps.apple.com/app/userscripts/id1463298887). |
+| **iOS / iPadOS** | [**Greasy Fork (1-Click Install)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Run via [Userscripts for Safari](https://apps.apple.com/app/userscripts/id1463298887) or [Orion Browser](https://kagi.com/orion/). Supports 1-click install & auto-updates. |
 
 ---
 

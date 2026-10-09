@@ -8,14 +8,16 @@
 // @match           http://www.msftconnecttest.com/redirect
 // @match           http://www.gstatic.com/generate_204
 // @match           http://edge-http.microsoft.com/captiveportal/generate_204
-// @version         3.0.0
+// @version         3.1.0
 // @license         MIT
 // @author          seojihyuk
 // @grant           GM_getValue
 // @grant           GM_setValue
-// @description     Auto-login + statistical session-expiry prediction for Cité Universitaire WiFi.
-//                  Tracks natural session durations, predicts minimum lifetime, and proactively
-//                  re-opens the login portal before the session expires.
+// @downloadURL     https://raw.githubusercontent.com/seojihyuk26/CiupWifi/main/wifiLogin.js
+// @updateURL       https://raw.githubusercontent.com/seojihyuk26/CiupWifi/main/wifiLogin.js
+// @homepageURL     https://github.com/seojihyuk26/CiupWifi
+// @supportURL      https://github.com/seojihyuk26/CiupWifi/issues
+// @description     Auto-login + session renewal for Cité Universitaire (CIUP) WiFi.
 // ==/UserScript==
 'use strict';
 

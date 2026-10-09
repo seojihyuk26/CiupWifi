@@ -37,7 +37,7 @@
 
 1. 기기를 기숙사 와이파이인 **WifiCity**에 연결합니다.
 2. **CiupWifi**를 실행하고, 캠퍼스 계정 아이디와 비밀번호를 입력한 뒤 **Connect**를 누릅니다.
-3. 창을 닫아도 됩니다. 프로그램이 작업표시줄(트레이)에서 계속 동작하며 이후의 모든 로그인과 세션 연장을 자동으로 처리합니다.
+3. 연결 즉시 프로그램 창을 닫으셔도 됩니다(`[X]`). 운영체제(Windows 작업 스케줄러 / macOS LaunchAgent)에 백그라운드 재인증이 자동 등록되어 메모리 낭비 없이 끊겼을 때만 조용히 로그인됩니다.
 
 ---
 
@@ -50,7 +50,7 @@
 | **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (또는 `.msi`) | 표준 Windows 인스톨러입니다.<br>*(PC 보호 경고 창 발생 시: **추가 정보** 클릭 > **실행**)* |
 | **macOS** | `CiupWifi_x.x.x_universal.dmg` | 파일을 열고 `CiupWifi.app`을 응용 프로그램으로 드래그합니다.<br>*(보안 경고 시: 우클릭 > **열기**)* |
 | **Android** | `CiupWifi.apk` | 안드로이드 스마트폰/태블릿용 서명된 APK 설치 파일입니다. |
-| **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (유저스크립트) | [Orion Browser](https://kagi.com/orion/) 또는 Safari의 [Userscripts 확장](https://apps.apple.com/app/userscripts/id1463298887)에 `wifiLogin.js`를 등록하여 사용합니다. |
+| **iOS / iPadOS** | [**Greasy Fork (원클릭 설치)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Safari의 [Userscripts 확장](https://apps.apple.com/app/userscripts/id1463298887) 또는 [Orion Browser](https://kagi.com/orion/)에서 1초 만에 설치 및 자동 업데이트가 지원됩니다. |
 
 ---
 

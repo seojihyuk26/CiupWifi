@@ -126,3 +126,11 @@ jobs:
           tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger Greasy Fork Sync
+        if: env.GREASYFORK_WEBHOOK_URL != ''
+        run: |
+          echo "Triggering Greasy Fork userscript sync..."
+          curl -s -X POST "${{ secrets.GREASYFORK_WEBHOOK_URL }}" || true
+        env:
+          GREASYFORK_WEBHOOK_URL: ${{ secrets.GREASYFORK_WEBHOOK_URL }}
