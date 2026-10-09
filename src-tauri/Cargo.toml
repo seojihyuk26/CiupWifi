@@ -11,11 +11,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri          = { version = "2", features = ["tray-icon", "image-png"] }
-tauri-plugin-store = "2"
-tauri-plugin-shell = "2"
-serde          = { version = "1", features = ["derive"] }
-serde_json     = "1"
-reqwest        = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies", "json"] }
-scraper        = "0.22"
-tokio          = { version = "1", features = ["full"] }
+tauri      = { version = "2", features = ["tray-icon", "image-png"] }
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest    = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies"] }

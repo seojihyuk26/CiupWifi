@@ -2,8 +2,6 @@ use tauri::Manager;
 
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             crate::commands::login_to_portal,
             crate::commands::check_connectivity,
@@ -68,36 +66,68 @@ pub fn run() {
 
 mod commands {
     use reqwest::Client;
-    use scraper::{Html, Selector};
     use std::collections::HashMap;
     use tauri::Manager;
 
     fn parse_form(html_text: &str) -> (String, HashMap<String, String>) {
-        let document = Html::parse_document(html_text);
-        let form_selector = Selector::parse("form").unwrap();
-        let action = document
-            .select(&form_selector)
-            .next()
-            .and_then(|f| f.value().attr("action"))
-            .map(|a| {
-                if a.starts_with("http") {
-                    a.to_string()
-                } else {
-                    format!("http://10.254.0.254{}", a)
-                }
-            })
-            .unwrap_or_else(|| "http://10.254.0.254/login".to_string());
-
         let mut form_data: HashMap<String, String> = HashMap::new();
-        let hidden_selector = Selector::parse("input[type='hidden']").unwrap();
-        for input in document.select(&hidden_selector) {
-            if let (Some(name), Some(value)) = (
-                input.value().attr("name"),
-                input.value().attr("value"),
-            ) {
-                form_data.insert(name.to_string(), value.to_string());
+        let mut action = "http://10.254.0.254:1000/login".to_string();
+
+        // 1. form action 추출
+        if let Some(form_idx) = html_text.to_lowercase().find("<form") {
+            let rest = &html_text[form_idx..];
+            if let Some(action_idx) = rest.to_lowercase().find("action=") {
+                let after = &rest[action_idx + 7..];
+                let quote = after.chars().next().unwrap_or('"');
+                let (offset, end) = if quote == '"' || quote == '\'' {
+                    (1, after[1..].find(quote).unwrap_or(after.len() - 1))
+                } else {
+                    (0, after.find(|c: char| c.is_whitespace() || c == '>').unwrap_or(after.len()))
+                };
+                let act = &after[offset..offset + end];
+                if !act.is_empty() {
+                    action = if act.starts_with("http") {
+                        act.to_string()
+                    } else {
+                        format!("http://10.254.0.254:1000{}", act)
+                    };
+                }
             }
         }
+
+        // 2. hidden input 태그의 name, value 속성 추출
+        let lower = html_text.to_lowercase();
+        let mut pos = 0;
+        while let Some(tag_start) = lower[pos..].find("<input") {
+            let abs_start = pos + tag_start;
+            let tag_end = match lower[abs_start..].find('>') {
+                Some(e) => abs_start + e,
+                None => break,
+            };
+            let tag = &html_text[abs_start..tag_end];
+            let tag_lower = &lower[abs_start..tag_end];
+
+            if tag_lower.contains("hidden") {
+                let get_attr = |attr_name: &str| -> Option<String> {
+                    let pat = format!("{}=", attr_name);
+                    let idx = tag_lower.find(&pat)?;
+                    let val_str = &tag[idx + pat.len()..];
+                    let q = val_str.chars().next()?;
+                    let (off, len) = if q == '"' || q == '\'' {
+                        (1, val_str[1..].find(q)?)
+                    } else {
+                        (0, val_str.find(|c: char| c.is_whitespace() || c == '>').unwrap_or(val_str.len()))
+                    };
+                    Some(val_str[off..off + len].to_string())
+                };
+
+                if let (Some(name), Some(val)) = (get_attr("name"), get_attr("value")) {
+                    form_data.insert(name, val);
+                }
+            }
+            pos = tag_end + 1;
+        }
+
         (action, form_data)
     }
 
