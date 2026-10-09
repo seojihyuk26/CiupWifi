@@ -72,6 +72,35 @@ mod commands {
     use std::collections::HashMap;
     use tauri::Manager;
 
+    fn parse_form(html_text: &str) -> (String, HashMap<String, String>) {
+        let document = Html::parse_document(html_text);
+        let form_selector = Selector::parse("form").unwrap();
+        let action = document
+            .select(&form_selector)
+            .next()
+            .and_then(|f| f.value().attr("action"))
+            .map(|a| {
+                if a.starts_with("http") {
+                    a.to_string()
+                } else {
+                    format!("http://10.254.0.254{}", a)
+                }
+            })
+            .unwrap_or_else(|| "http://10.254.0.254/login".to_string());
+
+        let mut form_data: HashMap<String, String> = HashMap::new();
+        let hidden_selector = Selector::parse("input[type='hidden']").unwrap();
+        for input in document.select(&hidden_selector) {
+            if let (Some(name), Some(value)) = (
+                input.value().attr("name"),
+                input.value().attr("value"),
+            ) {
+                form_data.insert(name.to_string(), value.to_string());
+            }
+        }
+        (action, form_data)
+    }
+
     // ── 포털 직접 HTTP 로그인 ──────────────────────────────────────────────────
     #[tauri::command]
     pub async fn login_to_portal(username: String, password: String) -> Result<bool, String> {
@@ -89,34 +118,7 @@ mod commands {
             .map_err(|e| format!("포털 연결 실패: {}", e))?;
 
         let html_text = resp.text().await.map_err(|e| e.to_string())?;
-        let document = Html::parse_document(&html_text);
-
-        // form action 파싱
-        let form_selector = Selector::parse("form").unwrap();
-        let action = document
-            .select(&form_selector)
-            .next()
-            .and_then(|f| f.value().attr("action"))
-            .map(|a| {
-                if a.starts_with("http") {
-                    a.to_string()
-                } else {
-                    format!("http://10.254.0.254{}", a)
-                }
-            })
-            .unwrap_or_else(|| "http://10.254.0.254/login".to_string());
-
-        // hidden fields 파싱
-        let mut form_data: HashMap<String, String> = HashMap::new();
-        let hidden_selector = Selector::parse("input[type='hidden']").unwrap();
-        for input in document.select(&hidden_selector) {
-            if let (Some(name), Some(value)) = (
-                input.value().attr("name"),
-                input.value().attr("value"),
-            ) {
-                form_data.insert(name.to_string(), value.to_string());
-            }
-        }
+        let (action, mut form_data) = parse_form(&html_text);
 
         // 자격증명 추가 (포털 필드명: ft_un, ft_pd)
         form_data.insert("ft_un".to_string(), username);
