@@ -1,6 +1,6 @@
 {
   "name": "ciupwifi",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "CIUP WiFi auto-login app",
   "scripts": {
     "dev": "tauri dev",

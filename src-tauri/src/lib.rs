@@ -8,6 +8,7 @@ pub fn run() {
             crate::commands::check_connectivity,
             crate::commands::save_credentials,
             crate::commands::load_credentials,
+            crate::commands::setup_background_task,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -288,5 +289,75 @@ pub mod commands {
         }
         let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         serde_json::from_str(&content).map_err(|e| e.to_string())
+    }
+
+    #[tauri::command]
+    pub fn setup_background_task(_enable: bool) -> Result<(), String> {
+        let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let _exe_path = current_exe.to_string_lossy().to_string();
+
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+            if _enable {
+                let _ = std::process::Command::new("schtasks")
+                    .args(&["/create", "/tn", "CiupWifiAuto", "/tr", &format!("\"{}\" --silent", _exe_path), "/sc", "minute", "/mo", "30", "/f"])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output();
+                let _ = std::process::Command::new("schtasks")
+                    .args(&["/create", "/tn", "CiupWifiLogon", "/tr", &format!("\"{}\" --silent", _exe_path), "/sc", "onlogon", "/f"])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output();
+            } else {
+                let _ = std::process::Command::new("schtasks")
+                    .args(&["/delete", "/tn", "CiupWifiAuto", "/f"])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output();
+                let _ = std::process::Command::new("schtasks")
+                    .args(&["/delete", "/tn", "CiupWifiLogon", "/f"])
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .output();
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(home) = std::env::var("HOME") {
+                let plist_path = std::path::PathBuf::from(home)
+                    .join("Library/LaunchAgents/org.ciup.wifi.plist");
+                if _enable {
+                    if let Some(parent) = plist_path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    let plist_content = format!(
+                        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>org.ciup.wifi</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{}</string>
+        <string>--silent</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>1800</integer>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>"#,
+                        _exe_path
+                    );
+                    let _ = std::fs::write(&plist_path, plist_content);
+                } else {
+                    let _ = std::fs::remove_file(&plist_path);
+                }
+            }
+        }
+
+        Ok(())
     }
 }

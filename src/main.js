@@ -22,6 +22,9 @@ function showConnected(username) {
     }
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     document.getElementById('status-time').textContent = `Online (${timeStr})`;
+
+    // Automatically register OS background task
+    invoke('setup_background_task', { enable: true }).catch(() => {});
 }
 
 function showLogin() {
@@ -140,6 +143,7 @@ document.getElementById('btn-recheck').addEventListener('click', async () => {
     btn.textContent = 'Check Connection';
 });
 document.getElementById('btn-logout').addEventListener('click', () => {
+    invoke('setup_background_task', { enable: false }).catch(() => {});
     showLogin();
     clearStatus();
 });
