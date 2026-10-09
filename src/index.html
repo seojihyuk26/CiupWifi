@@ -7,23 +7,23 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- ── Status Card ── -->
   <div id="app">
+    <!-- ── Status Card (Connected) ── -->
     <div class="card" id="card-status" style="display:none">
       <div class="icon">✅</div>
       <h1>WifiCity Connected</h1>
-      <p class="sub" id="tray-hint">Running in tray — auto re-login armed.</p>
-      <div class="stat">🔁 Next re-login: <strong id="next-relogin">—</strong></div>
-      <div class="stat">⏱ Min session: <strong id="min-session">learning…</strong></div>
-      <div class="stat" id="history-stat">📊 0 sessions recorded</div>
-      <button class="btn-secondary" id="btn-logout">Log out / Switch account</button>
+      <p class="sub">Internet access is active.</p>
+      <div class="stat">🕒 Status: <strong id="status-time">Online</strong></div>
+      <div class="stat">👤 Account: <strong id="current-user">—</strong></div>
+      <button class="btn-primary" id="btn-recheck" style="margin-top:16px">Check Connection</button>
+      <button class="btn-secondary" id="btn-logout" style="margin-top:8px">Change Account</button>
     </div>
 
     <!-- ── Login Card ── -->
     <div class="card" id="card-login">
       <div class="icon">📶</div>
       <h1>WifiCity Login</h1>
-      <p class="sub">CIUP Wi-Fi auto-login</p>
+      <p class="sub">CIUP Wi-Fi login & reconnect</p>
 
       <div class="field">
         <label for="username">Username</label>

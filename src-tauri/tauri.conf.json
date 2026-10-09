@@ -1,6 +1,6 @@
 {
   "productName": "CiupWifi",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "identifier": "org.ciup.wifi",
   "build": {
     "frontendDist": "../src"
@@ -15,11 +15,7 @@
         "resizable": false,
         "center": true
       }
-    ],
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true
-    }
+    ]
   },
   "bundle": {
     "active": true,

@@ -8,74 +8,89 @@ pub fn run() {
             crate::commands::check_connectivity,
             crate::commands::save_credentials,
             crate::commands::load_credentials,
-            crate::commands::save_session_history,
-            crate::commands::load_session_history,
         ])
-        .setup(|_app| {
-            // System tray configuration (desktop only)
-            #[cfg(desktop)]
-            {
-                let app = _app;
-                use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-                use tauri::menu::{Menu, MenuItem};
-
-                let quit = MenuItem::with_id(app, "quit", "Quit CiupWifi", true, None::<&str>)?;
-                let show = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&show, &quit])?;
-
-                TrayIconBuilder::new()
-                    .icon(app.default_window_icon().unwrap().clone())
-                    .menu(&menu)
-                    .on_menu_event(|app, event| match event.id.as_ref() {
-                        "quit" => app.exit(0),
-                        "show" => {
-                            if let Some(win) = app.get_webview_window("main") {
-                                let _ = win.show();
-                                let _ = win.set_focus();
-                            }
-                        }
-                        _ => {}
-                    })
-                    .on_tray_icon_event(|tray, event| {
-                        if let TrayIconEvent::Click {
-                            button: MouseButton::Left,
-                            button_state: MouseButtonState::Up,
-                            ..
-                        } = event
-                        {
-                            let app = tray.app_handle();
-                            if let Some(win) = app.get_webview_window("main") {
-                                let _ = win.show();
-                                let _ = win.set_focus();
-                            }
-                        }
-                    })
-                    .build(app)?;
-            }
-            Ok(())
-        })
-        .on_window_event(|_window, _event| {
-            // Close window -> minimize to system tray (desktop only)
-            #[cfg(desktop)]
-            if let tauri::WindowEvent::CloseRequested { api, .. } = _event {
-                _window.hide().unwrap();
-                api.prevent_close();
-            }
-        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
-mod commands {
+pub fn run_headless() {
+    tauri::async_runtime::block_on(async {
+        let (username, password) = match read_credentials_direct() {
+            Some(creds) => creds,
+            None => {
+                eprintln!("[CiupWifi] No saved credentials found. Please open CiupWifi once to save your login.");
+                return;
+            }
+        };
+
+        // Check if already connected
+        if let Ok(status) = commands::check_connectivity_internal().await {
+            if status == "connected" {
+                println!("[CiupWifi] Internet is already active.");
+                return;
+            }
+        }
+
+        println!("[CiupWifi] Captive portal detected. Logging in as {}...", username);
+        match commands::login_to_portal_internal(&username, &password).await {
+            Ok(true) => println!("[CiupWifi] Login successful!"),
+            Ok(false) => eprintln!("[CiupWifi] Login rejected. Please verify credentials."),
+            Err(e) => eprintln!("[CiupWifi] Connection error: {}", e),
+        }
+    });
+}
+
+fn get_app_dir(app: Option<&tauri::AppHandle>) -> std::path::PathBuf {
+    if let Some(a) = app {
+        if let Ok(dir) = a.path().app_data_dir() {
+            return dir;
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            return std::path::PathBuf::from(appdata).join("org.ciup.wifi");
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            return std::path::PathBuf::from(home).join("Library/Application Support/org.ciup.wifi");
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+            return std::path::PathBuf::from(xdg).join("org.ciup.wifi");
+        } else if let Ok(home) = std::env::var("HOME") {
+            return std::path::PathBuf::from(home).join(".config/org.ciup.wifi");
+        }
+    }
+    std::path::PathBuf::from("org.ciup.wifi")
+}
+
+pub fn read_credentials_direct() -> Option<(String, String)> {
+    let dir = get_app_dir(None);
+    let path = dir.join("credentials.json");
+    let content = std::fs::read_to_string(path).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let u = v.get("username")?.as_str()?.to_string();
+    let p = v.get("password")?.as_str()?.to_string();
+    if u.is_empty() || p.is_empty() {
+        None
+    } else {
+        Some((u, p))
+    }
+}
+
+pub mod commands {
     use reqwest::Client;
     use std::collections::HashMap;
-    use tauri::Manager;
 
     fn parse_form(html_text: &str) -> (String, HashMap<String, String>) {
         let mut form_data: HashMap<String, String> = HashMap::new();
         let mut action = "http://10.254.0.254:1000/login".to_string();
 
-        // 1. Extract form action
         if let Some(form_idx) = html_text.to_lowercase().find("<form") {
             let rest = &html_text[form_idx..];
             if let Some(action_idx) = rest.to_lowercase().find("action=") {
@@ -97,7 +112,6 @@ mod commands {
             }
         }
 
-        // 2. Extract hidden input tags (name, value attributes)
         let lower = html_text.to_lowercase();
         let mut pos = 0;
         while let Some(tag_start) = lower[pos..].find("<input") {
@@ -133,9 +147,7 @@ mod commands {
         (action, form_data)
     }
 
-    // ── Direct HTTP portal login (WifiCity FortiGate compatibility) ───────────
-    #[tauri::command]
-    pub async fn login_to_portal(username: String, password: String) -> Result<bool, String> {
+    pub async fn login_to_portal_internal(username: &str, password: &str) -> Result<bool, String> {
         let client = Client::builder()
             .cookie_store(true)
             .timeout(std::time::Duration::from_secs(10))
@@ -143,16 +155,15 @@ mod commands {
             .build()
             .map_err(|e| e.to_string())?;
 
-        // 1. Detect WifiCity (FortiGate) portal URL (default port: 1000)
         let mut target_url = "http://10.254.0.254:1000/".to_string();
-        let probe_client = Client::builder()
-            .timeout(std::time::Duration::from_secs(4))
+        let probe = Client::builder()
+            .timeout(std::time::Duration::from_secs(3))
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .ok();
 
-        if let Some(probe) = probe_client {
-            if let Ok(resp) = probe.get("http://www.google.com/gen_204").send().await {
+        if let Some(p) = probe {
+            if let Ok(resp) = p.get("http://www.google.com/gen_204").send().await {
                 if let Some(loc) = resp.headers().get("location").and_then(|l| l.to_str().ok()) {
                     if loc.contains("10.254.0.254") {
                         target_url = loc.to_string();
@@ -161,14 +172,13 @@ mod commands {
             }
         }
 
-        // 2. GET portal page (fallback to port 80 if port 1000 fails)
         let resp = match client.get(&target_url).send().await {
             Ok(r) => r,
             Err(_) => client
                 .get("http://10.254.0.254/")
                 .send()
                 .await
-                .map_err(|e| format!("Failed to connect to WifiCity portal: {}", e))?,
+                .map_err(|e| format!("WifiCity connection failed: {}", e))?,
         };
 
         let current_url = resp.url().to_string();
@@ -179,7 +189,6 @@ mod commands {
             action = format!("http://10.254.0.254:1000{}", action);
         }
 
-        // Extract magic token from URL query string if present
         for url_str in [&current_url, &target_url] {
             if let Some(idx) = url_str.find("magic=") {
                 let val = &url_str[idx + 6..];
@@ -194,29 +203,24 @@ mod commands {
             }
         }
 
-        // Credentials: send both FortiGate fields (ft_un/ft_pd) and standard fields (username/password)
-        form_data.insert("ft_un".to_string(), username.clone());
-        form_data.insert("ft_pd".to_string(), password.clone());
-        form_data.insert("username".to_string(), username);
-        form_data.insert("password".to_string(), password);
+        form_data.insert("ft_un".to_string(), username.to_string());
+        form_data.insert("ft_pd".to_string(), password.to_string());
+        form_data.insert("username".to_string(), username.to_string());
+        form_data.insert("password".to_string(), password.to_string());
 
-        // 3. POST -> submit login
         let login_resp = client
             .post(&action)
             .form(&form_data)
             .send()
             .await
-            .map_err(|e| format!("WifiCity login request failed: {}", e))?;
+            .map_err(|e| format!("Login request failed: {}", e))?;
 
         let body = login_resp.text().await.unwrap_or_default();
-
-        // 4. Verify authentication success
         let mut success = body.contains("Success")
             || body.to_lowercase().contains("welcome")
             || body.to_lowercase().contains("connected")
             || body.to_lowercase().contains("keep this window open");
 
-        // Cross-verify via Google gen_204 probe if body is inconclusive
         if !success {
             if let Ok(verify) = client.get("http://www.google.com/gen_204").send().await {
                 if verify.status().as_u16() == 204 {
@@ -228,27 +232,21 @@ mod commands {
         Ok(success)
     }
 
-    // ── Check internet connectivity / captive portal ─────────────────────────
-    #[tauri::command]
-    pub async fn check_connectivity() -> Result<String, String> {
+    pub async fn check_connectivity_internal() -> Result<String, String> {
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(4))
+            .timeout(std::time::Duration::from_secs(3))
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| e.to_string())?;
 
-        // 1. Google 204 probe (standard captive portal probe)
         if let Ok(resp) = client.get("http://www.google.com/gen_204").send().await {
             if resp.status().as_u16() == 204 {
                 return Ok("connected".to_string());
             }
         }
 
-        // 2. Apple hotspot-detect probe (secondary check)
         if let Ok(resp) = client.get("http://captive.apple.com/hotspot-detect.html").send().await {
-            let status = resp.status().as_u16();
-            let body = resp.text().await.unwrap_or_default();
-            if status == 200 && body.contains("Success") {
+            if resp.status().as_u16() == 200 && resp.text().await.unwrap_or_default().contains("Success") {
                 return Ok("connected".to_string());
             }
         }
@@ -256,7 +254,16 @@ mod commands {
         Ok("captive".to_string())
     }
 
-    // ── Save / Load credentials locally ──────────────────────────────────────
+    #[tauri::command]
+    pub async fn login_to_portal(username: String, password: String) -> Result<bool, String> {
+        login_to_portal_internal(&username, &password).await
+    }
+
+    #[tauri::command]
+    pub async fn check_connectivity() -> Result<String, String> {
+        check_connectivity_internal().await
+    }
+
     #[tauri::command]
     pub fn save_credentials(
         app: tauri::AppHandle,
@@ -264,48 +271,20 @@ mod commands {
         password: String,
     ) -> Result<(), String> {
         use std::io::Write;
-        let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+        let data_dir = super::get_app_dir(Some(&app));
         std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
         let cred = serde_json::json!({ "username": username, "password": password });
-        let mut f = std::fs::File::create(data_dir.join("credentials.json"))
-            .map_err(|e| e.to_string())?;
+        let mut f = std::fs::File::create(data_dir.join("credentials.json")).map_err(|e| e.to_string())?;
         f.write_all(cred.to_string().as_bytes()).map_err(|e| e.to_string())?;
         Ok(())
     }
 
     #[tauri::command]
     pub fn load_credentials(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-        let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+        let data_dir = super::get_app_dir(Some(&app));
         let path = data_dir.join("credentials.json");
         if !path.exists() {
             return Ok(serde_json::json!({ "username": "", "password": "" }));
-        }
-        let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&content).map_err(|e| e.to_string())
-    }
-
-    // ── Save / Load session history ──────────────────────────────────────────
-    #[tauri::command]
-    pub fn save_session_history(
-        app: tauri::AppHandle,
-        history: Vec<u64>,
-    ) -> Result<(), String> {
-        use std::io::Write;
-        let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-        std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
-        let mut f = std::fs::File::create(data_dir.join("session_history.json"))
-            .map_err(|e| e.to_string())?;
-        f.write_all(serde_json::to_string(&history).unwrap().as_bytes())
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    #[tauri::command]
-    pub fn load_session_history(app: tauri::AppHandle) -> Result<Vec<u64>, String> {
-        let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-        let path = data_dir.join("session_history.json");
-        if !path.exists() {
-            return Ok(vec![]);
         }
         let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         serde_json::from_str(&content).map_err(|e| e.to_string())

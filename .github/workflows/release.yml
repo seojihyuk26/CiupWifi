@@ -91,6 +91,9 @@ jobs:
       - name: Init Tauri Android project
         run: npx tauri android init --ci
 
+      - name: Apply Custom App Icons to Android
+        run: cp -rf src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
+
       - name: Build Android APK
         run: npx tauri android build --apk
 
