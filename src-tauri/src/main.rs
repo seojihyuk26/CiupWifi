@@ -1,4 +1,5 @@
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn main() {
-    ciupwifi_lib::run()
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+fn main() {
+    ciupwifi_lib::run();
 }

@@ -1,7 +1,7 @@
 {
   "productName": "CiupWifi",
-  "version": "1.0.1",
-  "identifier": "com.ciupwifi.app",
+  "version": "1.0.2",
+  "identifier": "org.ciup.wifi",
   "build": {
     "frontendDist": "../src"
   },

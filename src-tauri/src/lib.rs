@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -10,10 +11,11 @@ pub fn run() {
             crate::commands::save_session_history,
             crate::commands::load_session_history,
         ])
-        .setup(|app| {
+        .setup(|_app| {
             // System tray configuration (desktop only)
             #[cfg(desktop)]
             {
+                let app = _app;
                 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
                 use tauri::menu::{Menu, MenuItem};
 
@@ -52,11 +54,11 @@ pub fn run() {
             }
             Ok(())
         })
-        .on_window_event(|window, event| {
+        .on_window_event(|_window, _event| {
             // Close window -> minimize to system tray (desktop only)
             #[cfg(desktop)]
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                window.hide().unwrap();
+            if let tauri::WindowEvent::CloseRequested { api, .. } = _event {
+                _window.hide().unwrap();
                 api.prevent_close();
             }
         })
