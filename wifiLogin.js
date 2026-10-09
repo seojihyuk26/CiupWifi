@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name            cite university wifi auto login script
 // @name:fr         Cité université wifi auto login script
+// @name:ko         Cité 기숙사 와이파이 자동 로그인 스크립트
 // @namespace       seojihyuk@university
 // @match           http://10.254.0.254:*/*
 // @match           http://captive.apple.com/*
@@ -18,6 +19,8 @@
 // @homepageURL     https://github.com/seojihyuk26/CiupWifi
 // @supportURL      https://github.com/seojihyuk26/CiupWifi/issues
 // @description     Auto-login + session renewal for Cité Universitaire (CIUP) WiFi.
+// @description:fr  Connexion automatique et renouvellement pour le Wi-Fi de la Cité Universitaire (CIUP).
+// @description:ko  Cité Universitaire (CIUP) WifiCity 포털 자동 로그인 및 세션 갱신 스크립트
 // ==/UserScript==
 'use strict';
 
