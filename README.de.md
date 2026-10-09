@@ -5,8 +5,7 @@
 </p>
 
 <p align="center">
-  <b>Automatische Anmeldung für das "WifiCity"-WLAN der Cité internationale universitaire de Paris (CIUP).</b><br>
-  <i>Bleiben Sie online, ohne ständig Benutzername und Passwort eingeben zu müssen.</i>
+  <b>Dienstprogramm zur automatischen Anmeldung und Sitzungsverwaltung für das Netzwerk „WifiCity“ der Cité internationale universitaire de Paris (CIUP).</b>
 </p>
 
 <p align="center">
@@ -19,67 +18,98 @@
 </p>
 
 > [!WARNING]
-> **Wichtiger Hinweis (Inoffizielles Tool)**: Dies ist eine unabhängige, von Bewohnern erstellte Hilfsanwendung. Es handelt sich **NICHT** um eine offizielle App der Cité internationale universitaire de Paris (CIUP).
+> **Hinweis**: Dies ist ein unabhängiges Open-Source-Tool, das von Bewohnern entwickelt wurde. Es ist **keine** offizielle Anwendung und steht in keiner Verbindung zur Verwaltung oder den IT-Diensten der Cité internationale universitaire de Paris (CIUP).
 
 ---
 
-## 🤔 Wozu dient diese App? (Zweck)
+## Überblick
 
-Jeder, der an der CIUP wohnt und das Campus-WLAN (**WifiCity**) nutzt, kennt das Problem:
-- Alle paar Stunden läuft die Sitzung ab und das Internet bricht plötzlich ab.
-- Man muss einen Browser öffnen, warten, bis die Login-Seite lädt, und die Zugangsdaten erneut eingeben.
-- Beim Lernen, Streamen oder in Videoanrufen wird die Verbindung mitten im Satz unterbrochen.
+Das Campus-WLAN der CIUP (**WifiCity**) beendet aktive Sitzungen über das Captive Portal regelmäßig, sodass Bewohner mehrmals täglich einen Webbrowser öffnen und ihre Anmeldedaten erneut eingeben müssen.
 
-**CiupWifi löst dieses Problem dauerhaft.**  
-Einmal installiert, läuft die App unauffällig im Hintergrund auf Ihrem Computer oder Smartphone. Sie verbindet Sie automatisch mit dem WLAN und erneuert die Verbindung selbstständig *bevor* sie abbricht.
+**CiupWifi** automatisiert diesen Ablauf:
+- Nahtlose Authentifizierung im Hintergrund ohne Browserfenster.
+- Erfassung der tatsächlichen Sitzungsdauer und vorausschauende Erneuerung der Verbindung vor dem Timeout.
+- Ressourcen schonender Betrieb im Infobereich (System Tray) mit minimalem Speicherbedarf (< 15 MB).
 
 ---
 
-## 🚀 Einfache Bedienung (In 3 Schritten)
-
-Die Einrichtung ist in **wenigen Sekunden** erledigt:
+## Verwendung
 
 1. Verbinden Sie Ihr Gerät mit dem WLAN **WifiCity**.
-2. **Öffnen Sie CiupWifi**, geben Sie Ihren **Benutzernamen** und Ihr **Passwort** ein und klicken Sie auf **Connect**.
-3. **Fertig!** Sie können das Fenster schließen.
-   - Auf PC/Mac bleibt die App im Infobereich (System Tray neben der Uhr) aktiv.
-   - Bevor Ihre Sitzung abläuft, verlängert CiupWifi die Verbindung automatisch im Hintergrund.
+2. Starten Sie **CiupWifi**, geben Sie Ihre Zugangsdaten ein und klicken Sie auf **Connect**.
+3. Schließen Sie das Fenster. Die Anwendung läuft im Hintergrund im System Tray weiter und übernimmt künftige Anmeldungen und Verlängerungen automatisch.
 
 ---
 
-## 📥 Herunterladen
+## Herunterladen
 
-Laden Sie die passende Version auf der **[GitHub Releases-Seite](https://github.com/seojihyuk26/CiupWifi/releases/latest)** herunter:
+Offizielle Pakete finden Sie auf der **[Releases-Seite](https://github.com/seojihyuk26/CiupWifi/releases/latest)**:
 
-| Ihr Gerät | Datei | Einfache Installation |
+| Plattform | Datei | Hinweise |
 |---|---|---|
-| **Windows PC** | `CiupWifi_x.x.x_x64-setup.exe` | Herunterladen, doppelklicken und installieren. |
-| **Mac (Apple)** | `CiupWifi_x.x.x_universal.dmg` | Datei öffnen und `CiupWifi` in den Programme-Ordner ziehen.<br>*(Bei Sicherheitshinweis: Rechtsklick > **Öffnen**)* |
-| **Android Smartphone** | `app-universal-release-unsigned.apk` | APK-Datei auf das Handy herunterladen und installieren. |
-| **iPhone / iPad** | [`wifiLogin.js`](wifiLogin.js) (Skript) | [Orion Browser](https://kagi.com/orion/) oder die Safari-Erweiterung [Userscripts](https://apps.apple.com/app/userscripts/id1463298887) installieren und das Skript `wifiLogin.js` hinzufügen. |
+| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (oder `.msi`) | Standard-Installationsdatei für Windows. |
+| **macOS** | `CiupWifi_x.x.x_universal.dmg` | `CiupWifi.app` in den Programme-Ordner ziehen.<br>*(Bei Gatekeeper-Meldung: Rechtsklick > **Öffnen**)* |
+| **Android** | `app-universal-release-unsigned.apk` | Eigenständiges APK-Paket für Android-Geräte. |
+| **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (Userscript) | Über [Orion Browser](https://kagi.com/orion/) oder die Safari-Erweiterung [Userscripts](https://apps.apple.com/app/userscripts/id1463298887) nutzbar. |
 
 ---
 
-## 🔒 Sind meine Daten sicher?
+## Datenschutz & Sicherheit
 
-**Ja, zu 100%.**
-- Ihre Zugangsdaten werden **ausschließlich lokal auf Ihrem eigenen Gerät** gespeichert.
-- Es werden keinerlei Daten an externe Server oder Entwickler übertragen.
-- Die App kommuniziert ausschließlich direkt mit der internen Login-Seite (`10.254.0.254`).
-- Das gesamte Projekt ist quelloffen (Open Source), kostenlos und transparent.
-
----
-
-## 🙏 Danksagung & Referenzen
-
-Dieses Projekt basiert auf wertvollen Vorarbeiten aus der Bewohner-Community der CIUP:
-- **[Thomas-dd3/WifiCity_captiveportal](https://github.com/Thomas-dd3/WifiCity_captiveportal)**: Großartige Automatisierungsskripte für Windows und Linux, die den Port `1000` und die FortiGate-Sicherheitstoken (`magic`) entschlüsselt haben.
-- **[Gist von Ranadeep Biswas](https://gist.github.com/rnbguy/6f574caa6b3535162a20750cb1777a09)**: Das ursprüngliche Shell-Skript für Linux zur automatischen WifiCity-Anmeldung.
-
-CiupWifi bündelt diese technischen Erkenntnisse in einer modernen grafischen App für den unkomplizierten Alltag aller Studierenden.
+- **Ausschließlich lokale Speicherung**: Zugangsdaten werden nur lokal auf Ihrem Gerät in Standard-Verzeichnissen gespeichert.
+- **Direkte Gateway-Kommunikation**: Anfragen gehen ausschließlich an die interne Portalseite (`10.254.0.254`).
+- **Keine Telemetrie**: Keine Tracking-Tools, Statistiken oder externe Server.
+- **Vollständig Open Source**: Der Quellcode ist öffentlich einsehbar und prüfbar.
 
 ---
 
-## 📄 Lizenz
+## Technische Details & Architektur
+
+Für Entwickler und interessierte Nutzer:
+
+### 1. Direkte native HTTP-Authentifizierung
+Statt JavaScript in ein WebView oder einen Browser einzuschleusen, nutzt CiupWifi ein leichtes Rust-Backend über `reqwest`:
+- Fragt `http://www.google.com/gen_204` ab, um Captive-Portal-Umleitungen zu erkennen.
+- Fängt die HTTP-302-Umleitung zu den FortiGate-Endpunkten ab (`http://10.254.0.254:1000/fgtauth?...`).
+- Liest das dynamische Sitzungstoken (`magic`) aus und sendet ein kompatibles Formularpaket (`ft_un`/`username`, `ft_pd`/`password`, `magic`).
+- Überprüft den erfolgreichen Verbindungsaufbau über nachfolgende HTTP-204-Rückmeldungen.
+
+### 2. Vorausschauender Erneuerungsalgorithmus
+- Führt eine Historie der tatsächlichen Sitzungsdauern (bis zu 30 Einträge).
+- Ermittelt das statistische Minimum ($T_{\text{min}}$).
+- Setzt einen Erneuerungstimer auf $T_{\text{min}} - T_{\text{vergangen}} - 5\text{ Min.}$, um Verbindungsabbrüche bei der Arbeit oder beim Streaming zu verhindern.
+- Vorausschauend ausgelöste Anmeldungen werden aus der Ausfallstatistik ausgeschlossen, um das Modell präzise zu halten.
+
+---
+
+## Referenzen & Danksagung
+
+Dieses Projekt baut auf Vorarbeiten aus der studentischen Entwickler-Community der CIUP auf:
+- **[Thomas-dd3/WifiCity_captiveportal](https://github.com/Thomas-dd3/WifiCity_captiveportal)**: Ermittelte den FortiGate-Port `1000`, die Rolle des Tokens `magic` und stellte erste Windows- und Linux-Skripte bereit.
+- **[Ranadeep Biswas (rnbguy)](https://gist.github.com/rnbguy/6f574caa6b3535162a20750cb1777a09)**: Entwickler des ursprünglichen Linux-Shell-Skripts zur WifiCity-Anmeldung.
+
+---
+
+## Quellcode kompilieren
+
+### Voraussetzungen
+- Node.js 20+
+- Rust 1.77+
+- Tauri CLI v2 (`npm install -g @tauri-apps/cli`)
+
+```bash
+# Abhängigkeiten installieren
+npm install
+
+# Entwicklungsmodus starten
+npm run dev
+
+# Release-Pakete erstellen
+npm run build
+```
+
+---
+
+## Lizenz
 
 Veröffentlicht unter der [MIT-Lizenz](LICENSE).

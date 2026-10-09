@@ -5,8 +5,7 @@
 </p>
 
 <p align="center">
-  <b>巴黎国际大学城 (CIUP) “WifiCity” 校园 Wi-Fi 自动登录与防断线工具。</b><br>
-  <i>再也不用每天反复在网页里手动输入账号密码了。</i>
+  <b>巴黎国际大学城 (CIUP) “WifiCity” 校园无线网络自动登录与会话保持工具。</b>
 </p>
 
 <p align="center">
@@ -19,67 +18,78 @@
 </p>
 
 > [!WARNING]
-> **重要声明（非官方辅助软件）**：本软件为住户学生个人开发的开源便利工具。本工具**绝非**巴黎国际大学城 (CIUP) 官方应用，与大学城行政或网络 IT 部门无任何关联。
+> **免责声明**：本软件为住户学生自主开发的独立开源辅助工具。**绝非**巴黎国际大学城 (CIUP) 官方应用，且与大学城管理层或网络信息部门无任何隶属关系。
 
 ---
 
-## 🤔 为什么需要这个软件？（设计目的）
+## 概述
 
-只要你住在 CIUP 并连接过大学城的无线网络（**WifiCity**），你一定遇到过这些烦恼：
-- 每隔几小时网络就会自动失效，突然断网。
-- 你必须手动打开浏览器，等待认证页面慢吞吞加载，然后重新敲一遍用户名和密码。
-- 上课、查资料、看视频或视频通话时，网络经常毫无征兆地中断。
+巴黎国际大学城 (CIUP) 的校园 Wi-Fi 网络 (**WifiCity**) 设有定期的强制门户超时机制，导致住户每天必须多次重新在浏览器中输入账号密码进行身份验证。
 
-**CiupWifi 就是为了彻底解决这个问题而生的。**  
-安装之后，它会在你的电脑或手机后台静默运行。它不仅能自动为你登录 Wi-Fi，还会根据平时断线的规律，在网络即将失效的前几分钟*主动*提前为你续期，保证你的网络畅通不掉线。
-
----
-
-## 🚀 怎么使用？（简单 3 步）
-
-你只需要设置**一次**即可：
-
-1. 设备连上大学城的无线网络 **WifiCity**。
-2. **打开 CiupWifi 软件**，输入你在大学城分配到的 **用户名 (Username)** 和 **密码 (Password)**，点击 **Connect**。
-3. **完成！** 直接关闭软件窗口即可。
-   - 电脑端：软件会自动最小化到任务栏右下角托盘图标，默默守护网络。
-   - 以后每次连接 Wi-Fi 或快要断网时，它都会在后台自动重新认证，完全不需要你操心。
+**CiupWifi** 旨在自动化此流程：
+- 后台静默完成认证，无需弹出任何浏览器窗口。
+- 跟踪实际网络会话有效时长，并在断线前主动提前续期。
+- 最小化常驻系统托盘，内存占用极低（< 15 MB）。
 
 ---
 
-## 📥 下载安装
+## 使用方法
 
-请在 **[GitHub 最新版本发布页](https://github.com/seojihyuk26/CiupWifi/releases/latest)** 下载适合你设备的版本：
+1. 将设备连接至大学城 **WifiCity** 无线网络。
+2. 打开 **CiupWifi**，输入您的大学城账号与密码，点击 **Connect**。
+3. 关闭窗口即可。程序会常驻任务栏托盘，并在后台自动处理后续的所有登录与超时续期。
 
-| 你的设备 | 下载文件名 | 快速安装指南 |
+---
+
+## 下载安装
+
+安装包可在 **[GitHub Releases 页面](https://github.com/seojihyuk26/CiupWifi/releases/latest)** 获取：
+
+| 操作系统 | 安装包文件 | 说明 |
 |---|---|---|
-| **Windows 电脑** | `CiupWifi_x.x.x_x64-setup.exe` | 下载后双击安装，并在开始菜单运行。 |
-| **苹果电脑 (Mac)** | `CiupWifi_x.x.x_universal.dmg` | 打开文件，把 `CiupWifi` 拖进 Applications 文件夹。<br>*(若提示无法打开未识别开发者：鼠标右键点击图标 > 点击 **打开**)* |
-| **安卓手机 (Android)** | `app-universal-release-unsigned.apk` | 下载 APK 文件并在手机上直接点击安装。 |
-| **iPhone / iPad** | [`wifiLogin.js`](wifiLogin.js) (浏览器脚本) | 安装 [Orion Browser](https://kagi.com/orion/) 浏览器或 Safari 的 [Userscripts 插件](https://apps.apple.com/app/userscripts/id1463298887)，然后添加 `wifiLogin.js` 脚本即可。 |
+| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (或 `.msi`) | 标准 Windows 安装包，可在开始菜单启动。 |
+| **macOS** | `CiupWifi_x.x.x_universal.dmg` | 将 `CiupWifi.app` 拖入 Applications 目录。<br>*(若出现安全提示：右键点击图标 > 选择 **打开**)* |
+| **Android** | `app-universal-release-unsigned.apk` | 适用于安卓设备的独立 APK 安装包。 |
+| **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (脚本) | 可在 iOS 上通过 [Orion Browser](https://kagi.com/orion/) 或 Safari [Userscripts 扩展](https://apps.apple.com/app/userscripts/id1463298887) 运行 `wifiLogin.js`。 |
 
 ---
 
-## 🔒 我的密码安全吗？
+## 隐私与安全
 
-**绝对安全。**
-- 你的账号密码**仅保存在你自己设备本地**的系统安全存储中。
-- 绝不向任何第三方服务器或软件作者发送任何个人数据。
-- 软件只与大学城内部的认证网关页面（`10.254.0.254`）进行直接通信。
-- 整个项目完全开源透明，任何人都可以随时审查代码。
-
----
-
-## 🙏 致谢与参考项目
-
-本项目深受 CIUP 学生社区此前研究成果的启发与帮助：
-- **[Thomas-dd3/WifiCity_captiveportal](https://github.com/Thomas-dd3/WifiCity_captiveportal)**：编写了出色的 Windows 与 Linux 脚本，发现了大学城 FortiGate 系统的 `1000` 端口与 `magic` 安全认证机制。
-- **[Ranadeep Biswas's Gist](https://gist.github.com/rnbguy/6f574caa6b3535162a20750cb1777a09)**：最初用于 Linux 系统的 WifiCity 自动登录脚本原型。
-
-CiupWifi 将这些技术成果转化为对全体住户简单好用、无需技术背景的现代化图形软件。
+- **仅限本地存储**：登录凭据仅保存在本机操作系统的应用数据目录中。
+- **直接网关通信**：请求仅直接发送至大学城内部网关地址 (`10.254.0.254`)。
+- **无数据回传**：不包含任何数据埋点、统计或第三方服务器交互。
+- **全开源透明**：全部源代码均公开以供安全审查。
 
 ---
 
-## 📄 许可证
+## 技术实现与架构
 
-本项目基于 [MIT 许可证](LICENSE) 开源发布。
+供开发者及感兴趣的用户参考的技术细节：
+
+### 1. 原生直接 HTTP 认证
+与在 WebView 或浏览器中注入脚本不同，CiupWifi 采用轻量 Rust 后端（基于 `reqwest`）：
+- 探测 `http://www.google.com/gen_204` 以识别强制网络跳转。
+- 拦截重定向至 FortiGate 网关接口（`http://10.254.0.254:1000/fgtauth?...`）。
+- 提取动态会话认证凭证（`magic`），并提交双重兼容的表单参数（`ft_un`/`username`, `ft_pd`/`password`, `magic`）。
+- 通过后续的 HTTP 204 请求验证连通性是否真正恢复。
+
+### 2. 预测性主动续期算法
+- 维护自然会话持续时长的滚动历史记录（最多 30 条）。
+- 计算统计学上的最小有效会话周期 ($T_{\text{min}}$)。
+- 在 $T_{\text{min}} - T_{\text{已过去时间}} - 5\text{ 分钟}$ 触发自动重新认证，防止在重要工作或观看视频时意外断线。
+- 主动发起的重连会被标记并排除在自然断线统计之外，以确保预测模型精度。
+
+---
+
+## 致谢与参考项目
+
+本项目深受 CIUP 学生社区先期技术探索的启发：
+- **[Thomas-dd3/WifiCity_captiveportal](https://github.com/Thomas-dd3/WifiCity_captiveportal)**：发现了 FortiGate 系统的 `1000` 端口以及 `magic` 认证参数，并提供了实用的 Windows/Linux 命令行脚本。
+- **[Ranadeep Biswas (rnbguy)](https://gist.github.com/rnbguy/6f574caa6b3535162a20750cb1777a09)**：最初用于 Linux 系统的 WifiCity 登录脚本原型。
+
+---
+
+## 开源许可证
+
+遵循 [MIT 许可证](LICENSE) 发布。
