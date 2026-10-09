@@ -97,32 +97,23 @@ jobs:
       - name: Build Android APK
         run: npx tauri android build --apk
 
-      - name: Sign APKs
+      - name: Sign APK
         run: |
           keytool -genkeypair -v -keystore release.keystore -alias ciupwifi -keyalg RSA -keysize 2048 -validity 10000 -storepass ciupwifipass -keypass ciupwifipass -dname "CN=CiupWifi, O=CIUP, C=FR"
           mkdir -p release-apks
           shopt -s globstar nullglob
           for apk in src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk; do
-            filename=$(basename "$apk")
-            if [[ "$filename" == *"unsigned"* ]]; then
-              signed_name="${filename/-unsigned/}"
-              $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:ciupwifipass --key-pass pass:ciupwifipass --out "release-apks/$signed_name" "$apk"
-            else
-              cp "$apk" "release-apks/$filename"
-            fi
-          done
-          for apk in release-apks/*universal*.apk release-apks/*arm64-v8a*.apk release-apks/*.apk; do
             if [ -f "$apk" ]; then
-              cp "$apk" release-apks/CiupWifi.apk
+              $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:ciupwifipass --key-pass pass:ciupwifipass --out "release-apks/CiupWifi.apk" "$apk"
               break
             fi
           done
-          ls -la release-apks/
+          ls -lh release-apks/
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apks/*.apk
+          files: release-apks/CiupWifi.apk
           tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
