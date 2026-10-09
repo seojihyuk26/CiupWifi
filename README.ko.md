@@ -52,6 +52,18 @@
 | **Android** | `CiupWifi.apk` | 안드로이드 스마트폰/태블릿용 서명된 APK 설치 파일입니다. |
 | **iOS / iPadOS** | [**Greasy Fork (원클릭 설치)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Safari의 [Userscripts 확장](https://apps.apple.com/app/userscripts/id1463298887) 또는 [Orion Browser](https://kagi.com/orion/)에서 1초 만에 설치 및 자동 업데이트가 지원됩니다. |
 
+### 📱 iOS / iPadOS 사용 가이드 (Safari / Orion)
+
+iOS에서는 외부 설치 파일(.ipa) 직접 배포가 제한되므로, Safari 유저스크립트 방식을 통해 동일하게 자동 로그인을 지원합니다:
+
+1. **확장 프로그램 설치 (택1)**:
+   * **Safari 브라우저**: App Store에서 무료 [Userscripts 앱](https://apps.apple.com/app/userscripts/id1463298887)을 설치한 뒤, 아이폰 `설정 > Safari > 확장 프로그램`에서 활성화합니다.
+   * **Orion 브라우저**: [Orion Browser](https://kagi.com/orion/) 설치 (크롬/파이어폭스 확장 기본 지원).
+2. **스크립트 원클릭 설치**:
+   * [Greasy Fork 스크립트 페이지](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1)를 열고 **[Install this script]** 버튼을 누릅니다.
+3. **사용**:
+   * 와이파이 연결 시 뜨는 포털 창에서 평소처럼 1회만 로그인하면, 계정 정보가 브라우저 로컬 저장소에 저장되어 이후 캡티브 창이 뜰 때마다 1초 만에 자동 로그인됩니다.
+
 ---
 
 ## 개인정보 보호 및 보안

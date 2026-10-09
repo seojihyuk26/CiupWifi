@@ -52,6 +52,18 @@ Official binary packages are available on the **[Releases](https://github.com/se
 | **Android** | `CiupWifi.apk` | Signed APK package for Android devices. |
 | **iOS / iPadOS** | [**Greasy Fork (1-Click Install)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Run via [Userscripts for Safari](https://apps.apple.com/app/userscripts/id1463298887) or [Orion Browser](https://kagi.com/orion/). Supports 1-click install & auto-updates. |
 
+### 📱 iOS / iPadOS Setup Guide (Safari / Orion)
+
+Due to iOS sandbox restrictions, iOS and iPadOS devices use a browser Userscript:
+
+1. **Install a Userscript Extension (choose one)**:
+   * **Safari**: Install [Userscripts for Safari](https://apps.apple.com/app/userscripts/id1463298887) from the App Store, then enable it in `Settings > Safari > Extensions`.
+   * **Orion**: Install [Orion Browser](https://kagi.com/orion/) (features native WebExtension support on iOS).
+2. **Install Script**:
+   * Open the [Greasy Fork Script Page](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) and tap **[Install this script]**.
+3. **Connect**:
+   * Log in to the WifiCity captive portal once. The script securely stores credentials locally in your browser and automatically logs you in whenever the portal prompt appears.
+
 ---
 
 ## Privacy & Security
