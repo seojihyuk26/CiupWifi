@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background Gradient: Elegant Paris Navy -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f2b5c"/>
+    </linearGradient>
+
+    <!-- Golden WiFi Glow -->
+    <linearGradient id="wifiGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+
+    <!-- Gold Accent -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+
+    <!-- Shadow filter -->
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Base Rounded Squircle -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle circular accent in background -->
+  <circle cx="512" cy="460" r="320" fill="#38bdf8" opacity="0.04"/>
+
+  <!-- French Tricolore subtle top-accent bar -->
+  <g transform="translate(427, 80)">
+    <rect x="0" y="0" width="56" height="8" rx="4" fill="#3b82f6"/>
+    <rect x="62" y="0" width="46" height="8" rx="4" fill="#ffffff" opacity="0.9"/>
+    <rect x="114" y="0" width="56" height="8" rx="4" fill="#ef4444"/>
+  </g>
+
+  <!-- WiFi Waves emanating from the CIUP Tower (Top) -->
+  <g fill="none" stroke="url(#wifiGrad)" stroke-linecap="round" filter="url(#dropShadow)">
+    <!-- Outer wave -->
+    <path d="M 272 260 A 340 340 0 0 1 752 260" stroke-width="38"/>
+    <!-- Middle wave -->
+    <path d="M 352 335 A 230 230 0 0 1 672 335" stroke-width="38"/>
+    <!-- Inner wave -->
+    <path d="M 432 410 A 115 115 0 0 1 592 410" stroke-width="38"/>
+  </g>
+
+  <!-- Glowing Antenna Tip -->
+  <circle cx="512" cy="455" r="14" fill="#38bdf8" filter="url(#dropShadow)"/>
+
+  <!-- CIUP Maison Internationale Architectural Silhouette & Clock Tower -->
+  <g fill="#f8fafc" filter="url(#dropShadow)">
+    <!-- Central Tower Spire -->
+    <path d="M 508 455 L 516 455 L 518 495 L 506 495 Z"/>
+    <!-- Clock Tower Roof / Bell Turret -->
+    <path d="M 512 490 L 536 530 L 488 530 Z"/>
+    <rect x="490" y="530" width="44" height="42" rx="4"/>
+    <!-- Clock face inside tower -->
+    <circle cx="512" cy="551" r="11" fill="#0f172a"/>
+    <!-- Clock hands -->
+    <line x1="512" y1="551" x2="512" y2="545" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="512" y1="551" x2="517" y2="551" stroke="#f8fafc" stroke-width="2.5" stroke-linecap="round"/>
+
+    <!-- Central Pavilion Gable & Dormer -->
+    <path d="M 512 568 L 560 615 L 464 615 Z"/>
+    
+    <!-- Chateau Mansard Roofline -->
+    <path d="M 330 615 L 464 615 L 560 615 L 694 615 L 664 570 L 634 570 L 626 550 L 610 550 L 604 570 L 420 570 L 414 550 L 398 550 L 390 570 L 360 570 Z"/>
+
+    <!-- Main Palace Facade & Arches -->
+    <rect x="330" y="615" width="364" height="75" rx="3"/>
+    
+    <!-- Windows & Classical Arches (cutouts) -->
+    <!-- Center Grand Arch -->
+    <path d="M 494 690 V 654 A 18 18 0 0 1 530 654 V 690 Z" fill="#0f172a"/>
+    <!-- Flanking arches -->
+    <rect x="456" y="646" width="22" height="34" rx="10" fill="#0f172a"/>
+    <rect x="546" y="646" width="22" height="34" rx="10" fill="#0f172a"/>
+    <rect x="418" y="646" width="22" height="34" rx="10" fill="#0f172a"/>
+    <rect x="584" y="646" width="22" height="34" rx="10" fill="#0f172a"/>
+    <rect x="376" y="646" width="22" height="34" rx="10" fill="#0f172a"/>
+    <rect x="626" y="646" width="22" height="34" rx="10" fill="#0f172a"/>
+  </g>
+
+  <!-- Base Podium Line -->
+  <rect x="290" y="688" width="444" height="8" rx="4" fill="#94a3b8"/>
+
+  <!-- CIUP Text & WiFi Badge -->
+  <!-- "CIUP" bold stylish typography -->
+  <text x="512" y="805" 
+        font-family="system-ui, -apple-system, 'SF Pro Display', 'Montserrat', sans-serif" 
+        font-size="94" 
+        font-weight="900" 
+        letter-spacing="14" 
+        fill="#ffffff" 
+        text-anchor="middle"
+        filter="url(#dropShadow)">CIUP</text>
+
+  <!-- "WIFI" pill badge below CIUP -->
+  <g transform="translate(422, 840)">
+    <rect x="0" y="0" width="180" height="48" rx="24" fill="url(#goldGrad)" filter="url(#dropShadow)"/>
+    <text x="90" y="32" 
+          font-family="system-ui, -apple-system, sans-serif" 
+          font-size="24" 
+          font-weight="800" 
+          letter-spacing="6" 
+          fill="#0f172a" 
+          text-anchor="middle">WIFI</text>
+  </g>
+</svg>

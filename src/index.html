@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CiupWifi</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ── 상태 카드 ── -->
+  <div id="app">
+    <div class="card" id="card-status" style="display:none">
+      <div class="icon">✅</div>
+      <h1>WiFi Connected</h1>
+      <p class="sub" id="tray-hint">Running in tray — auto re-login armed.</p>
+      <div class="stat">🔁 Next re-login: <strong id="next-relogin">—</strong></div>
+      <div class="stat">⏱ Min session: <strong id="min-session">learning…</strong></div>
+      <div class="stat" id="history-stat">📊 0 sessions recorded</div>
+      <button class="btn-secondary" id="btn-logout">Log out / Switch account</button>
+    </div>
+
+    <!-- ── 로그인 카드 ── -->
+    <div class="card" id="card-login">
+      <div class="icon">📶</div>
+      <h1>CiupWifi</h1>
+      <p class="sub">CIUP auto-login</p>
+
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="your_username" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+
+      <div id="status-msg" class="status-msg" style="display:none"></div>
+
+      <button class="btn-primary" id="btn-login">Connect</button>
+
+      <p class="hint">Credentials are saved locally and used for auto-login.</p>
+    </div>
+  </div>
+
+  <script src="main.js" type="module"></script>
+</body>
+</html>
