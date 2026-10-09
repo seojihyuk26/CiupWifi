@@ -49,7 +49,7 @@ Offizielle Pakete finden Sie auf der **[Releases-Seite](https://github.com/seoji
 |---|---|---|
 | **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (oder `.msi`) | Standard-Installationsdatei für Windows. |
 | **macOS** | `CiupWifi_x.x.x_universal.dmg` | `CiupWifi.app` in den Programme-Ordner ziehen.<br>*(Bei Gatekeeper-Meldung: Rechtsklick > **Öffnen**)* |
-| **Android** | `app-universal-release-unsigned.apk` | Eigenständiges APK-Paket für Android-Geräte. |
+| **Android** | `CiupWifi.apk` | Eigenständiges APK-Paket für Android-Geräte. |
 | **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (Userscript) | Über [Orion Browser](https://kagi.com/orion/) oder die Safari-Erweiterung [Userscripts](https://apps.apple.com/app/userscripts/id1463298887) nutzbar. |
 
 ---
@@ -74,11 +74,10 @@ Statt JavaScript in ein WebView oder einen Browser einzuschleusen, nutzt CiupWif
 - Liest das dynamische Sitzungstoken (`magic`) aus und sendet ein kompatibles Formularpaket (`ft_un`/`username`, `ft_pd`/`password`, `magic`).
 - Überprüft den erfolgreichen Verbindungsaufbau über nachfolgende HTTP-204-Rückmeldungen.
 
-### 2. Vorausschauender Erneuerungsalgorithmus
-- Führt eine Historie der tatsächlichen Sitzungsdauern (bis zu 30 Einträge).
-- Ermittelt das statistische Minimum ($T_{\text{min}}$).
-- Setzt einen Erneuerungstimer auf $T_{\text{min}} - T_{\text{vergangen}} - 5\text{ Min.}$, um Verbindungsabbrüche bei der Arbeit oder beim Streaming zu verhindern.
-- Vorausschauend ausgelöste Anmeldungen werden aus der Ausfallstatistik ausgeschlossen, um das Modell präzise zu halten.
+### 2. Vorausschauende Sitzungserneuerung
+- Filtert kurze Störungen heraus und erfasst nur **Sitzungen ab 1 Stunde Dauer** (maximal die letzten 3 Einträge).
+- Nutzt die **kürzeste Dauer (Minimum)** als Richtwert und erneuert die Verbindung 5 Minuten vor diesem Zeitpunkt.
+- Vorausschauend erneuerte Verbindungen werden nicht als natürliche Trennung gezählt, damit der Richtwert zuverlässig bleibt.
 
 ---
 

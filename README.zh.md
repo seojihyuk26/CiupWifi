@@ -49,7 +49,7 @@
 |---|---|---|
 | **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (或 `.msi`) | 标准 Windows 安装包，可在开始菜单启动。 |
 | **macOS** | `CiupWifi_x.x.x_universal.dmg` | 将 `CiupWifi.app` 拖入 Applications 目录。<br>*(若出现安全提示：右键点击图标 > 选择 **打开**)* |
-| **Android** | `app-universal-release-unsigned.apk` | 适用于安卓设备的独立 APK 安装包。 |
+| **Android** | `CiupWifi.apk` | 适用于安卓设备的独立 APK 安装包。 |
 | **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (脚本) | 可在 iOS 上通过 [Orion Browser](https://kagi.com/orion/) 或 Safari [Userscripts 扩展](https://apps.apple.com/app/userscripts/id1463298887) 运行 `wifiLogin.js`。 |
 
 ---
@@ -74,11 +74,10 @@
 - 提取动态会话认证凭证（`magic`），并提交双重兼容的表单参数（`ft_un`/`username`, `ft_pd`/`password`, `magic`）。
 - 通过后续的 HTTP 204 请求验证连通性是否真正恢复。
 
-### 2. 预测性主动续期算法
-- 维护自然会话持续时长的滚动历史记录（最多 30 条）。
-- 计算统计学上的最小有效会话周期 ($T_{\text{min}}$)。
-- 在 $T_{\text{min}} - T_{\text{已过去时间}} - 5\text{ 分钟}$ 触发自动重新认证，防止在重要工作或观看视频时意外断线。
-- 主动发起的重连会被标记并排除在自然断线统计之外，以确保预测模型精度。
+### 2. 主动定时重连机制
+- 过滤掉睡眠或临时掉线等干扰，仅记录**持续 1 小时以上的正常会话**（最多保留最近 3 次）。
+- 以这些有效记录中的**最短持续时间（最小值）**为基准，在预计到期前 5 分钟提前自动续期。
+- 主动发起的重连不会计入自然断线历史，以保持基准时间准确。
 
 ---
 

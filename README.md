@@ -74,11 +74,10 @@ Rather than injecting JavaScript into an in-app WebView or browser, CiupWifi uti
 - Extracts the dynamic session token (`magic`) and submits dual-compatible form payloads (`ft_un`/`username`, `ft_pd`/`password`, `magic`).
 - Verifies successful connectivity via subsequent HTTP 204 responses.
 
-### 2. Predictive Session Renewal Algorithm
-- Maintains a rolling history of natural session durations (up to 30 records).
-- Calculates the statistical minimum valid session duration ($T_{\text{min}}$).
-- Schedules a proactive re-login timer at $T_{\text{min}} - T_{\text{elapsed}} - 5\text{ min}$, preempting sudden connection loss during work or media streaming.
-- Re-login requests initiated proactively are tagged and excluded from natural expiration statistics to preserve model accuracy.
+### 2. Proactive Session Renewal
+- Filters out transient noise (such as device sleep or signal drops) by only recording **sessions that lasted at least 1 hour** (retaining the last 3 records).
+- Uses the **minimum duration** among these records as a benchmark and automatically renews connection 5 minutes before that deadline.
+- Proactively renewed sessions are excluded from natural expiration history to keep timing accurate.
 
 ---
 

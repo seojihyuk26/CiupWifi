@@ -5,8 +5,8 @@ const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
 const CONFIG = {
     FAILED_RETRY_THRESHOLD_MS: 15_000,
     PRE_EXPIRY_BUFFER_MS: 5 * 60_000,
-    SESSION_HISTORY_MAX: 30,
-    MIN_VALID_SESSION_MS: 60_000,
+    SESSION_HISTORY_MAX: 3,                 // 최근 3개만 유지
+    MIN_VALID_SESSION_MS: 3_600_000,        // 1시간 이상 유지된 정상 세션만 기록
     MAX_VALID_SESSION_MS: 48 * 3_600_000,
 };
 

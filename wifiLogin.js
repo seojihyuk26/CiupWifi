@@ -26,9 +26,9 @@ const CONFIG = {
     /** Open login portal this many ms BEFORE predicted session expiry. */
     PRE_EXPIRY_BUFFER_MS: 5 * 60_000,
     /** Maximum number of session duration records to keep. */
-    SESSION_HISTORY_MAX: 30,
-    /** Ignore sessions shorter than this (noise / failed logins that slipped through). */
-    MIN_VALID_SESSION_MS: 60_000,
+    SESSION_HISTORY_MAX: 3,
+    /** Ignore sessions shorter than 1 hour (noise, sleep mode, signal drops). */
+    MIN_VALID_SESSION_MS: 3_600_000,
     /** Ignore sessions longer than this (anomaly / machine was asleep). */
     MAX_VALID_SESSION_MS: 48 * 3_600_000,
 };
