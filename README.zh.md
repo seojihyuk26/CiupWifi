@@ -5,7 +5,8 @@
 </p>
 
 <p align="center">
-  <b>巴黎国际大学城 (CIUP) Wi-Fi 快速自动登录与预测性主动重连工具。</b>
+  <b>巴黎国际大学城 (CIUP) “WifiCity” 校园 Wi-Fi 自动登录与防断线工具。</b><br>
+  <i>再也不用每天反复在网页里手动输入账号密码了。</i>
 </p>
 
 <p align="center">
@@ -18,56 +19,67 @@
 </p>
 
 > [!WARNING]
-> **重要免责声明**：本软件为学生自发开发的**非官方开源工具**。本软件**绝非**由**巴黎国际大学城 (CIUP)** 官方管理层或其网络信息技术部门开发、运营、授权或拥有任何附属关系。请用户自行辨别使用。
+> **重要声明（非官方辅助软件）**：本软件为住户学生个人开发的开源便利工具。本工具**绝非**巴黎国际大学城 (CIUP) 官方应用，与大学城行政或网络 IT 部门无任何关联。
 
 ---
 
-## 💡 CiupWifi 是什么？
+## 🤔 为什么需要这个软件？（设计目的）
 
-在巴黎国际大学城 (CIUP)，校园 Wi-Fi 强制门户 (Captive Portal) 经常自动断开会话，导致住户每天必须反复在网页中输入账号密码重新认证。
+只要你住在 CIUP 并连接过大学城的无线网络（**WifiCity**），你一定遇到过这些烦恼：
+- 每隔几小时网络就会自动失效，突然断网。
+- 你必须手动打开浏览器，等待认证页面慢吞吞加载，然后重新敲一遍用户名和密码。
+- 上课、查资料、看视频或视频通话时，网络经常毫无征兆地中断。
 
-**CiupWifi** 是基于 **Tauri v2** 开发的原生跨平台应用（支持 Windows、macOS、Android），彻底实现认证全自动化：
-- **无需打开浏览器**：通过底层原生 HTTP 请求直接向 `10.254.0.254` 提交登录认证，无弹窗扰屏，不依赖 WebView。
-- **智能预测性主动重连**：自动统计您以往的会话有效时长，并在会话即将超时断开的数分钟前*主动*完成重连，保障网络不掉线。
-- **轻量省电**：常驻系统托盘或后台服务，内存占用极低（< 15 MB）。
-- **隐私至上**：您的登录账号与密码仅加密保存在本地设备中，绝不会上传至任何外部网络。
+**CiupWifi 就是为了彻底解决这个问题而生的。**  
+安装之后，它会在你的电脑或手机后台静默运行。它不仅能自动为你登录 Wi-Fi，还会根据平时断线的规律，在网络即将失效的前几分钟*主动*提前为你续期，保证你的网络畅通不掉线。
 
 ---
 
-## 📥 下载与安装
+## 🚀 怎么使用？（简单 3 步）
 
-请前往 **[GitHub Releases 最新版本发布页](https://github.com/seojihyuk26/CiupWifi/releases/latest)** 下载适合您系统的安装包：
+你只需要设置**一次**即可：
 
-| 平台 | 安装文件 | 说明 |
+1. 设备连上大学城的无线网络 **WifiCity**。
+2. **打开 CiupWifi 软件**，输入你在大学城分配到的 **用户名 (Username)** 和 **密码 (Password)**，点击 **Connect**。
+3. **完成！** 直接关闭软件窗口即可。
+   - 电脑端：软件会自动最小化到任务栏右下角托盘图标，默默守护网络。
+   - 以后每次连接 Wi-Fi 或快要断网时，它都会在后台自动重新认证，完全不需要你操心。
+
+---
+
+## 📥 下载安装
+
+请在 **[GitHub 最新版本发布页](https://github.com/seojihyuk26/CiupWifi/releases/latest)** 下载适合你设备的版本：
+
+| 你的设备 | 下载文件名 | 快速安装指南 |
 |---|---|---|
-| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (或 `.msi`) | 运行安装程序并在开始菜单启动。 |
-| **macOS** | `CiupWifi_x.x.x_universal.dmg` | 打开 `.dmg` 镜像，将 `CiupWifi.app` 拖入 Applications。<br>*(若系统提示“未识别的开发者”，请右键点击应用并选择 **打开**)* |
-| **Android** | `app-universal-release-unsigned.apk` | 下载并安装 APK。若有提示，请允许安装来自未知来源的应用。 |
-| **iOS / iPhone** | [`wifiLogin.js`](wifiLogin.js) (脚本) | 可在 iOS 上通过 [Orion Browser](https://kagi.com/orion/) 或 Safari [Userscripts 扩展](https://apps.apple.com/app/userscripts/id1463298887) 安装 `wifiLogin.js` 脚本使用。 |
+| **Windows 电脑** | `CiupWifi_x.x.x_x64-setup.exe` | 下载后双击安装，并在开始菜单运行。 |
+| **苹果电脑 (Mac)** | `CiupWifi_x.x.x_universal.dmg` | 打开文件，把 `CiupWifi` 拖进 Applications 文件夹。<br>*(若提示无法打开未识别开发者：鼠标右键点击图标 > 点击 **打开**)* |
+| **安卓手机 (Android)** | `app-universal-release-unsigned.apk` | 下载 APK 文件并在手机上直接点击安装。 |
+| **iPhone / iPad** | [`wifiLogin.js`](wifiLogin.js) (浏览器脚本) | 安装 [Orion Browser](https://kagi.com/orion/) 浏览器或 Safari 的 [Userscripts 插件](https://apps.apple.com/app/userscripts/id1463298887)，然后添加 `wifiLogin.js` 脚本即可。 |
 
 ---
 
-## 🚀 使用指南
+## 🔒 我的密码安全吗？
 
-1. **连接**至大学城 CIUP Wi-Fi 网络。
-2. **启动 CiupWifi**。
-3. 首次使用时输入一次您的大学城网络 **用户名** 和 **密码**，点击 **Connect**。
-4. 完成！
-   - 电脑端：关闭窗口后程序会自动最小化常驻系统托盘。
-   - 软件会在网络即将断开前或重新连上 Wi-Fi 时自动在后台完成重连。
-
----
-
-## 🔒 安全与隐私保障
-
-- **无远程服务器**：软件不包含任何数据埋点、统计或追踪代码。
-- **本地存储**：账号密码仅存储于系统本地的标准 AppData 目录中。
-- **完全开源**：全部源代码公开透明，接受任何人审查。
+**绝对安全。**
+- 你的账号密码**仅保存在你自己设备本地**的系统安全存储中。
+- 绝不向任何第三方服务器或软件作者发送任何个人数据。
+- 软件只与大学城内部的认证网关页面（`10.254.0.254`）进行直接通信。
+- 整个项目完全开源透明，任何人都可以随时审查代码。
 
 ---
 
-## 📄 开源许可证与法律声明
+## 🙏 致谢与参考项目
 
-本软件遵循 [MIT 许可证](LICENSE) 开源发布。  
-**非官方软件**：CiupWifi 仅为住户学生开发的第三方辅助工具，与巴黎国际大学城 (Cité internationale universitaire de Paris) 官方机构无关。
+本项目深受 CIUP 学生社区此前研究成果的启发与帮助：
+- **[Thomas-dd3/WifiCity_captiveportal](https://github.com/Thomas-dd3/WifiCity_captiveportal)**：编写了出色的 Windows 与 Linux 脚本，发现了大学城 FortiGate 系统的 `1000` 端口与 `magic` 安全认证机制。
+- **[Ranadeep Biswas's Gist](https://gist.github.com/rnbguy/6f574caa6b3535162a20750cb1777a09)**：最初用于 Linux 系统的 WifiCity 自动登录脚本原型。
 
+CiupWifi 将这些技术成果转化为对全体住户简单好用、无需技术背景的现代化图形软件。
+
+---
+
+## 📄 许可证
+
+本项目基于 [MIT 许可证](LICENSE) 开源发布。

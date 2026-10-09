@@ -5,7 +5,8 @@
 </p>
 
 <p align="center">
-  <b>Connexion automatique et reconnexion proactive pour le Wi-Fi de la Cité internationale universitaire de Paris (CIUP).</b>
+  <b>Connexion automatique au réseau Wi-Fi "WifiCity" de la Cité internationale universitaire de Paris (CIUP).</b><br>
+  <i>Restez connecté sans devoir retaper vos identifiants à longueur de journée.</i>
 </p>
 
 <p align="center">
@@ -18,55 +19,67 @@
 </p>
 
 > [!WARNING]
-> **Avertissement important** : Cette application est un **outil open source non officiel** développé par des étudiants résidents. Elle n'est **EN AUCUN CAS** développée, approuvée, gérée ou affiliée à l'administration ou aux services informatiques de la **Cité internationale universitaire de Paris (CIUP)**.
+> **Information importante (Application non officielle)** : Il s'agit d'un utilitaire communautaire indépendant développé par un étudiant résident. Cette application n'est **PAS** officielle et n'est en aucun cas affiliée à l'administration ou à la DSI de la Cité internationale universitaire de Paris (CIUP).
 
 ---
 
-## 💡 Qu'est-ce que CiupWifi ?
+## 🤔 À quoi sert cette application ? (Objectif)
 
-À la Cité internationale universitaire de Paris (CIUP), le portail captif déconnecte régulièrement les sessions, obligeant les résidents à saisir leurs identifiants plusieurs fois par jour.
+Si vous habitez à la CIUP et utilisez le Wi-Fi de la cité (**WifiCity**), vous connaissez bien ce problème :
+- Toutes les quelques heures, la session expire et la connexion se coupe.
+- Vous devez ouvrir votre navigateur, attendre que la page de connexion s'affiche et retaper votre identifiant et votre mot de passe.
+- En plein appel vidéo, révision ou streaming, internet se coupe brutalement.
 
-**CiupWifi** est une application native multiplateforme (Windows, macOS, Android) développée avec **Tauri v2** qui automatise entièrement ce processus :
-- **Aucun navigateur requis** : Authentification directe auprès du portail `10.254.0.254` via des requêtes HTTP natives — aucune fenêtre de navigateur intempestive ni WebView.
-- **Reconnexion proactive prédictive** : Analyse la durée moyenne de vos sessions et anticipe l'expiration pour vous reconnecter automatiquement quelques minutes *avant* la coupure.
-- **Léger et économe en batterie** : Reste discrètement dans la barre d'état système (System Tray) avec une consommation mémoire minimale (< 15 Mo).
-- **Confidentialité totale** : Vos identifiants sont stockés exclusivement sur votre appareil local et ne quittent jamais votre machine.
+**CiupWifi résout ce problème une bonne fois pour toutes.**  
+Une fois installée, l'application tourne discrètement en arrière-plan sur votre ordinateur ou votre téléphone. Elle vous connecte automatiquement au Wi-Fi et anticipe l'expiration pour renouveler votre connexion *avant* qu'elle ne soit coupée.
 
 ---
 
-## 📥 Téléchargement & Installation
+## 🚀 Comment l'utiliser ? (En 3 étapes simples)
 
-Rendez-vous sur la page des **[Dernières versions GitHub](https://github.com/seojihyuk26/CiupWifi/releases/latest)** pour télécharger la version adaptée à votre système :
+La configuration ne prend que **30 secondes**, une seule fois :
 
-| Plateforme | Fichier | Instructions |
+1. **Connectez-vous** au réseau Wi-Fi de la résidence nommé **WifiCity**.
+2. **Ouvrez l'application CiupWifi**, entrez votre **Identifiant** et votre **Mot de passe** de campus, puis cliquez sur **Connect**.
+3. **C'est terminé !** Vous pouvez fermer la fenêtre.
+   - Sur PC/Mac, l'application reste active discrètement dans la barre des tâches (icône près de l'horloge).
+   - Dès que votre session s'apprête à expirer, l'application la renouvelle automatiquement sans vous déranger.
+
+---
+
+## 📥 Téléchargement
+
+Téléchargez la version correspondant à votre appareil depuis la **[Page des versions GitHub](https://github.com/seojihyuk26/CiupWifi/releases/latest)** :
+
+| Votre appareil | Fichier à télécharger | Installation facile |
 |---|---|---|
-| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (ou `.msi`) | Lancez l'installateur et ouvrez l'application depuis le menu Démarrer. |
-| **macOS** | `CiupWifi_x.x.x_universal.dmg` | Ouvrez le `.dmg` et glissez `CiupWifi.app` dans le dossier Applications.<br>*(Si macOS bloque l'ouverture pour développeur non identifié : faites un clic droit sur l'application > **Ouvrir**)* |
-| **Android** | `app-universal-release-unsigned.apk` | Téléchargez et installez le fichier APK. Autorisez l'installation d'applications de sources inconnues si demandé. |
-| **iOS / iPhone** | [`wifiLogin.js`](wifiLogin.js) (Userscript) | Utilisez [Orion Browser](https://kagi.com/orion/) ou l'extension [Userscripts pour Safari](https://apps.apple.com/app/userscripts/id1463298887) et installez `wifiLogin.js`. |
+| **Ordinateur Windows** | `CiupWifi_x.x.x_x64-setup.exe` | Téléchargez, double-cliquez pour installer et lancez l'application. |
+| **Mac (Apple)** | `CiupWifi_x.x.x_universal.dmg` | Ouvrez le fichier et glissez `CiupWifi` dans votre dossier Applications.<br>*(Si un message de sécurité apparaît : clic droit sur l'icône > **Ouvrir**)* |
+| **Téléphone Android** | `app-universal-release-unsigned.apk` | Téléchargez et installez le fichier APK sur votre smartphone. |
+| **iPhone / iPad** | [`wifiLogin.js`](wifiLogin.js) (Script) | Installez [Orion Browser](https://kagi.com/orion/) ou l'extension [Userscripts pour Safari](https://apps.apple.com/app/userscripts/id1463298887) et ajoutez le script `wifiLogin.js`. |
 
 ---
 
-## 🚀 Guide d'utilisation
+## 🔒 Mon mot de passe est-il en sécurité ?
 
-1. **Connectez-vous** au réseau Wi-Fi de la CIUP.
-2. **Lancez CiupWifi**.
-3. Saisissez votre **Identifiant** et votre **Mot de passe** de campus une seule fois, puis cliquez sur **Connect**.
-4. C'est tout ! 
-   - Sur ordinateur : Vous pouvez fermer la fenêtre, l'application reste active dans la barre d'état.
-   - CiupWifi se reconnectera automatiquement en tâche de fond avant chaque expiration de session.
-
----
-
-## 🔒 Sécurité & Vie privée
-
-- **Aucun serveur distant** : CiupWifi ne collecte aucune donnée télémétrique ni statistique externe.
-- **Stockage localisé** : Les identifiants sont sauvegardés uniquement dans le dossier de configuration local de l'application.
-- **Open Source** : L'intégralité du code source est ouverte et vérifiable par tous.
+**Oui, absolument.**
+- Vos identifiants sont enregistrés **uniquement sur votre propre appareil**.
+- Aucune donnée n'est envoyée à des serveurs tiers ou au créateur de l'application.
+- L'application communique exclusivement et directement avec la page de connexion de la cité (`10.254.0.254`).
+- Le projet est entièrement gratuit, open-source et transparent.
 
 ---
 
-## 📄 Licence & Mentions légales
+## 🙏 Remerciements et Références
 
-Distribué sous licence [MIT](LICENSE).  
-**Application non officielle** : CiupWifi est un utilitaire open-source indépendant créé par des résidents pour des résidents, et n'est en aucun cas affilié, soutenu ou associé à la Cité internationale universitaire de Paris (CIUP).
+Ce projet s'inspire directement des travaux et analyses préalables menés par la communauté étudiante de la CIUP :
+- **[Thomas-dd3/WifiCity_captiveportal](https://github.com/Thomas-dd3/WifiCity_captiveportal)** : Travail remarquable sur les scripts d'automatisation Windows et Linux ayant mis en lumière le port `1000` et les jetons de sécurité `magic` de FortiGate.
+- **[Gist de Ranadeep Biswas](https://gist.github.com/rnbguy/6f574caa6b3535162a20750cb1777a09)** : Script shell Linux original pour la connexion WifiCity.
+
+CiupWifi transforme ces découvertes techniques en une application graphique moderne et accessible à tous les résidents.
+
+---
+
+## 📄 Licence
+
+Distribué sous licence libre [MIT](LICENSE).
