@@ -11,7 +11,7 @@ pub fn run() {
             crate::commands::load_session_history,
         ])
         .setup(|app| {
-            // 시스템 트레이 설정 (데스크탑만)
+            // System tray configuration (desktop only)
             #[cfg(desktop)]
             {
                 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -53,7 +53,7 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // 창 닫기 → 트레이로 최소화 (데스크탑만)
+            // Close window -> minimize to system tray (desktop only)
             #[cfg(desktop)]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 window.hide().unwrap();
@@ -73,7 +73,7 @@ mod commands {
         let mut form_data: HashMap<String, String> = HashMap::new();
         let mut action = "http://10.254.0.254:1000/login".to_string();
 
-        // 1. form action 추출
+        // 1. Extract form action
         if let Some(form_idx) = html_text.to_lowercase().find("<form") {
             let rest = &html_text[form_idx..];
             if let Some(action_idx) = rest.to_lowercase().find("action=") {
@@ -95,7 +95,7 @@ mod commands {
             }
         }
 
-        // 2. hidden input 태그의 name, value 속성 추출
+        // 2. Extract hidden input tags (name, value attributes)
         let lower = html_text.to_lowercase();
         let mut pos = 0;
         while let Some(tag_start) = lower[pos..].find("<input") {
@@ -131,7 +131,7 @@ mod commands {
         (action, form_data)
     }
 
-    // ── 포털 직접 HTTP 로그인 (WifiCity FortiGate 호환) ────────────────────────
+    // ── Direct HTTP portal login (WifiCity FortiGate compatibility) ───────────
     #[tauri::command]
     pub async fn login_to_portal(username: String, password: String) -> Result<bool, String> {
         let client = Client::builder()
@@ -141,7 +141,7 @@ mod commands {
             .build()
             .map_err(|e| e.to_string())?;
 
-        // 1. WifiCity(FortiGate) 포털 감지 및 URL 확인 (기본 포트: 1000)
+        // 1. Detect WifiCity (FortiGate) portal URL (default port: 1000)
         let mut target_url = "http://10.254.0.254:1000/".to_string();
         let probe_client = Client::builder()
             .timeout(std::time::Duration::from_secs(4))
@@ -159,14 +159,14 @@ mod commands {
             }
         }
 
-        // 2. 포털 페이지 GET 요청 (1000 포트 실패 시 80 포트로 폴백)
+        // 2. GET portal page (fallback to port 80 if port 1000 fails)
         let resp = match client.get(&target_url).send().await {
             Ok(r) => r,
             Err(_) => client
                 .get("http://10.254.0.254/")
                 .send()
                 .await
-                .map_err(|e| format!("WifiCity 포털 연결 실패: {}", e))?,
+                .map_err(|e| format!("Failed to connect to WifiCity portal: {}", e))?,
         };
 
         let current_url = resp.url().to_string();
@@ -177,7 +177,7 @@ mod commands {
             action = format!("http://10.254.0.254:1000{}", action);
         }
 
-        // URL 쿼리에 magic 파라미터가 있으면 자동 추출 (FortiGate 인증 토큰)
+        // Extract magic token from URL query string if present
         for url_str in [&current_url, &target_url] {
             if let Some(idx) = url_str.find("magic=") {
                 let val = &url_str[idx + 6..];
@@ -192,29 +192,29 @@ mod commands {
             }
         }
 
-        // 자격증명: FortiGate 필드명(ft_un/ft_pd)과 스크립트 표준 필드명(username/password) 모두 전송
+        // Credentials: send both FortiGate fields (ft_un/ft_pd) and standard fields (username/password)
         form_data.insert("ft_un".to_string(), username.clone());
         form_data.insert("ft_pd".to_string(), password.clone());
         form_data.insert("username".to_string(), username);
         form_data.insert("password".to_string(), password);
 
-        // 3. POST → 로그인 제출
+        // 3. POST -> submit login
         let login_resp = client
             .post(&action)
             .form(&form_data)
             .send()
             .await
-            .map_err(|e| format!("WifiCity 로그인 요청 실패: {}", e))?;
+            .map_err(|e| format!("WifiCity login request failed: {}", e))?;
 
         let body = login_resp.text().await.unwrap_or_default();
 
-        // 4. 성공 판정
+        // 4. Verify authentication success
         let mut success = body.contains("Success")
             || body.to_lowercase().contains("welcome")
             || body.to_lowercase().contains("connected")
             || body.to_lowercase().contains("keep this window open");
 
-        // 응답 본문에서 확정할 수 없는 경우 google gen_204로 실제 연결 성공 여부 교차 검증
+        // Cross-verify via Google gen_204 probe if body is inconclusive
         if !success {
             if let Ok(verify) = client.get("http://www.google.com/gen_204").send().await {
                 if verify.status().as_u16() == 204 {
@@ -226,7 +226,7 @@ mod commands {
         Ok(success)
     }
 
-    // ── 인터넷 연결 / 캡티브 포털 감지 ──────────────────────────────────────
+    // ── Check internet connectivity / captive portal ─────────────────────────
     #[tauri::command]
     pub async fn check_connectivity() -> Result<String, String> {
         let client = Client::builder()
@@ -235,14 +235,14 @@ mod commands {
             .build()
             .map_err(|e| e.to_string())?;
 
-        // 1. Google 204 검사 (WifiCity 표준 캡티브 프로브)
+        // 1. Google 204 probe (standard captive portal probe)
         if let Ok(resp) = client.get("http://www.google.com/gen_204").send().await {
             if resp.status().as_u16() == 204 {
                 return Ok("connected".to_string());
             }
         }
 
-        // 2. Apple hotspot-detect 검사 (보조 검증)
+        // 2. Apple hotspot-detect probe (secondary check)
         if let Ok(resp) = client.get("http://captive.apple.com/hotspot-detect.html").send().await {
             let status = resp.status().as_u16();
             let body = resp.text().await.unwrap_or_default();
@@ -254,7 +254,7 @@ mod commands {
         Ok("captive".to_string())
     }
 
-    // ── 자격증명 저장 / 불러오기 (store 플러그인 대신 간단히 앱 데이터 폴더) ──
+    // ── Save / Load credentials locally ──────────────────────────────────────
     #[tauri::command]
     pub fn save_credentials(
         app: tauri::AppHandle,
@@ -282,7 +282,7 @@ mod commands {
         serde_json::from_str(&content).map_err(|e| e.to_string())
     }
 
-    // ── 세션 히스토리 저장 / 불러오기 ─────────────────────────────────────────
+    // ── Save / Load session history ──────────────────────────────────────────
     #[tauri::command]
     pub fn save_session_history(
         app: tauri::AppHandle,

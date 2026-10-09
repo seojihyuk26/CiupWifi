@@ -1,23 +1,23 @@
-// main.js — wifiLogin.js 로직을 Tauri invoke API로 이식
+// main.js — wifiLogin.js logic ported to Tauri invoke API
 const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
 
-// ── Config (wifiLogin.js와 동일) ──────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 const CONFIG = {
     FAILED_RETRY_THRESHOLD_MS: 15_000,
     PRE_EXPIRY_BUFFER_MS: 5 * 60_000,
-    SESSION_HISTORY_MAX: 3,                 // 최근 3개만 유지
-    MIN_VALID_SESSION_MS: 3_600_000,        // 1시간 이상 유지된 정상 세션만 기록
+    SESSION_HISTORY_MAX: 3,                 // Keep up to 3 recent records
+    MIN_VALID_SESSION_MS: 3_600_000,        // Only record sessions lasting >= 1 hour
     MAX_VALID_SESSION_MS: 48 * 3_600_000,
 };
 
-// ── 인메모리 상태 ─────────────────────────────────────────────────────────────
+// ── In-Memory State ───────────────────────────────────────────────────────────
 let sessionStartTime = 0;
-let sessionHistory   = [];   // ms 단위 세션 지속시간 배열
+let sessionHistory   = [];   // Array of session durations in ms
 let reloginTimer     = null;
 let lastAttemptTime  = 0;
 let wasProactive     = false;
 
-// ── 헬퍼 ─────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtDuration(ms) {
     const m = Math.round(ms / 60_000);
     return m >= 60 ? `${(m / 60).toFixed(1)} h` : `${m} min`;
@@ -34,7 +34,7 @@ function clearStatus() {
     document.getElementById('status-msg').style.display = 'none';
 }
 
-// ── 세션 히스토리 ─────────────────────────────────────────────────────────────
+// ── Session History ───────────────────────────────────────────────────────────
 async function loadHistory() {
     try {
         sessionHistory = await invoke('load_session_history');
@@ -62,7 +62,7 @@ function getMinSessionMs() {
     return sessionHistory.length > 0 ? Math.min(...sessionHistory) : null;
 }
 
-// ── 재로그인 타이머 ───────────────────────────────────────────────────────────
+// ── Re-login Timer ────────────────────────────────────────────────────────────
 function scheduleRelogin() {
     if (reloginTimer) clearTimeout(reloginTimer);
 
@@ -74,7 +74,7 @@ function scheduleRelogin() {
     const fireAt  = new Date(Date.now() + Math.max(delay, 0));
 
     if (delay <= 0) {
-        // 이미 만료 예상 → 즉시 재로그인
+        // Already past predicted expiry → re-login immediately
         wasProactive = true;
         doLogin();
         return null;
@@ -88,12 +88,12 @@ function scheduleRelogin() {
     return fireAt;
 }
 
-// ── UI 상태 전환 ──────────────────────────────────────────────────────────────
+// ── UI State Transitions ──────────────────────────────────────────────────────
 function showConnected(reloginAt) {
     document.getElementById('card-login').style.display   = 'none';
     document.getElementById('card-status').style.display  = 'block';
 
-    // 데스크탑에서는 트레이 힌트 표시
+    // Show tray status hint for desktop
     const isMobile = navigator.userAgent.includes('Android');
     document.getElementById('tray-hint').textContent = isMobile
         ? 'Keep the app running for auto re-login.'
@@ -118,25 +118,25 @@ function showLogin() {
     document.getElementById('card-login').style.display  = 'block';
 }
 
-// ── 로그인 실행 ───────────────────────────────────────────────────────────────
+// ── Login Action ──────────────────────────────────────────────────────────────
 async function doLogin() {
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
 
     if (!username || !password) {
-        setStatus('아이디와 비밀번호를 입력해주세요.', 'error');
+        setStatus('Please enter username and password.', 'error');
         return;
     }
 
     const btn = document.getElementById('btn-login');
     btn.disabled    = true;
     btn.textContent = 'Connecting…';
-    setStatus('포털에 연결 중…', 'info');
+    setStatus('Connecting to captive portal…', 'info');
 
-    // 재시도 쿨다운 체크
+    // Retry cooldown check
     const timeSinceLast = Date.now() - lastAttemptTime;
     if (timeSinceLast < CONFIG.FAILED_RETRY_THRESHOLD_MS && lastAttemptTime !== 0) {
-        setStatus('이전 로그인 실패 — 비밀번호를 확인해주세요.', 'error');
+        setStatus('Previous login failed — please check your password.', 'error');
         btn.disabled    = false;
         btn.textContent = 'Connect';
         return;
@@ -145,60 +145,60 @@ async function doLogin() {
     lastAttemptTime = Date.now();
 
     try {
-        // 자격증명 저장
+        // Save credentials locally
         await invoke('save_credentials', { username, password });
 
-        // 세션 종료 기록 (재로그인이면 스킵)
+        // Record session end (skip if proactive renewal)
         await recordSessionEnd();
 
-        // Rust → 직접 HTTP POST 로그인
+        // Native HTTP POST login via Rust backend
         const success = await invoke('login_to_portal', { username, password });
 
         if (success) {
-            lastAttemptTime  = 0; // 성공 → 쿨다운 리셋
+            lastAttemptTime  = 0; // Success → reset cooldown
             sessionStartTime = Date.now();
             const reloginAt  = scheduleRelogin();
             showConnected(reloginAt);
         } else {
-            setStatus('로그인 실패 — 아이디/비밀번호를 확인하세요.', 'error');
+            setStatus('Login failed — please check your username and password.', 'error');
             btn.disabled    = false;
             btn.textContent = 'Connect';
         }
     } catch (e) {
-        setStatus(`오류: ${e}`, 'error');
+        setStatus(`Error: ${e}`, 'error');
         btn.disabled    = false;
         btn.textContent = 'Connect';
     }
 }
 
-// ── 앱 시작 ───────────────────────────────────────────────────────────────────
+// ── Application Initialization ────────────────────────────────────────────────
 async function init() {
     await loadHistory();
 
-    // 저장된 자격증명 불러오기
+    // Load saved credentials
     const creds = await invoke('load_credentials').catch(() => ({ username: '', password: '' }));
     if (creds.username) document.getElementById('username').value = creds.username;
     if (creds.password) document.getElementById('password').value = creds.password;
 
-    // 네트워크 상태 확인 → 이미 연결됐으면 바로 타이머 설정
+    // Check network connectivity → arm timer if already connected
     try {
         const status = await invoke('check_connectivity');
         if (status === 'connected' && creds.username && creds.password) {
-            sessionStartTime = Date.now(); // 정확한 시작 시간 미지수, 현재부터 계산
+            sessionStartTime = Date.now();
             const reloginAt  = scheduleRelogin();
             showConnected(reloginAt);
             return;
         }
-    } catch { /* 포털 감지 실패 → 로그인 화면 */ }
+    } catch { /* Portal probe failed → show login screen */ }
 
-    // 저장된 자격증명 있으면 자동 로그인 시도
+    // Auto-login if credentials are saved
     if (creds.username && creds.password) {
-        setStatus('저장된 계정으로 자동 로그인 중…', 'info');
+        setStatus('Auto-logging in with saved credentials…', 'info');
         setTimeout(doLogin, 500);
     }
 }
 
-// ── 이벤트 바인딩 ─────────────────────────────────────────────────────────────
+// ── Event Bindings ────────────────────────────────────────────────────────────
 document.getElementById('btn-login').addEventListener('click', doLogin);
 document.getElementById('password').addEventListener('keydown', e => {
     if (e.key === 'Enter') doLogin();
