@@ -36,7 +36,7 @@ At the Cité internationale universitaire de Paris (CIUP), the captive portal re
 
 ## 📥 Download & Installation
 
-Visit the **[Latest GitHub Releases](https://github.com/seojihyuk/CiupWifi/releases/latest)** to download the version for your device:
+Visit the **[Latest GitHub Releases](https://github.com/seojihyuk26/CiupWifi/releases/latest)** to download the version for your device:
 
 | Platform | Download | Instructions |
 |---|---|---|

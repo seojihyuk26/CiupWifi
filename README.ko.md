@@ -36,7 +36,7 @@
 
 ## 📥 다운로드 및 설치
 
-**[GitHub 최신 릴리즈 페이지](https://github.com/seojihyuk/CiupWifi/releases/latest)**에서 본인의 기기에 맞는 설치 파일을 다운로드하세요:
+**[GitHub 최신 릴리즈 페이지](https://github.com/seojihyuk26/CiupWifi/releases/latest)**에서 본인의 기기에 맞는 설치 파일을 다운로드하세요:
 
 | 운영체제 | 다운로드 파일 | 설치 방법 |
 |---|---|---|
@@ -70,3 +70,4 @@
 
 본 프로젝트는 [MIT 라이선스](LICENSE)에 따라 배포됩니다.  
 **비공식 앱 고지**: 본 소프트웨어는 Cité internationale universitaire de Paris (CIUP)의 공식 프로그램이 아니며, 학생 커뮤니티 편의를 위해 독립적으로 제작된 오픈소스 도구입니다.
+

@@ -36,7 +36,7 @@
 
 ## 📥 Téléchargement & Installation
 
-Rendez-vous sur la page des **[Dernières versions GitHub](https://github.com/seojihyuk/CiupWifi/releases/latest)** pour télécharger la version adaptée à votre système :
+Rendez-vous sur la page des **[Dernières versions GitHub](https://github.com/seojihyuk26/CiupWifi/releases/latest)** pour télécharger la version adaptée à votre système :
 
 | Plateforme | Fichier | Instructions |
 |---|---|---|

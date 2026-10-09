@@ -36,7 +36,7 @@
 
 ## 📥 下载与安装
 
-请前往 **[GitHub Releases 最新版本发布页](https://github.com/seojihyuk/CiupWifi/releases/latest)** 下载适合您系统的安装包：
+请前往 **[GitHub Releases 最新版本发布页](https://github.com/seojihyuk26/CiupWifi/releases/latest)** 下载适合您系统的安装包：
 
 | 平台 | 安装文件 | 说明 |
 |---|---|---|
@@ -70,3 +70,4 @@
 
 本软件遵循 [MIT 许可证](LICENSE) 开源发布。  
 **非官方软件**：CiupWifi 仅为住户学生开发的第三方辅助工具，与巴黎国际大学城 (Cité internationale universitaire de Paris) 官方机构无关。
+

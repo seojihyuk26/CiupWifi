@@ -36,7 +36,7 @@ En la Cité internationale universitaire de Paris (CIUP), el portal cautivo expi
 
 ## 📥 Descarga e Instalación
 
-Accede a la sección de **[Últimas versiones en GitHub](https://github.com/seojihyuk/CiupWifi/releases/latest)** para descargar el instalador de tu dispositivo:
+Accede a la sección de **[Últimas versiones en GitHub](https://github.com/seojihyuk26/CiupWifi/releases/latest)** para descargar el instalador de tu dispositivo:
 
 | Plataforma | Archivo | Instrucciones |
 |---|---|---|
@@ -70,3 +70,4 @@ Accede a la sección de **[Últimas versiones en GitHub](https://github.com/seoj
 
 Distribuido bajo la [Licencia MIT](LICENSE).  
 **Aplicación no oficial**: CiupWifi es una herramienta comunitaria independiente y no tiene ninguna relación oficial con la Cité internationale universitaire de Paris (CIUP).
+

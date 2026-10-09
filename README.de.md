@@ -36,7 +36,7 @@ In der Cité internationale universitaire de Paris (CIUP) beendet das Captive Po
 
 ## 📥 Download & Installation
 
-Besuchen Sie die **[neueste GitHub Releases-Seite](https://github.com/seojihyuk/CiupWifi/releases/latest)**, um das passende Paket herunterzuladen:
+Besuchen Sie die **[neueste GitHub Releases-Seite](https://github.com/seojihyuk26/CiupWifi/releases/latest)**, um das passende Paket herunterzuladen:
 
 | Plattform | Datei | Anleitung |
 |---|---|---|
@@ -70,3 +70,4 @@ Besuchen Sie die **[neueste GitHub Releases-Seite](https://github.com/seojihyuk/
 
 Veröffentlicht unter der [MIT-Lizenz](LICENSE).  
 **Inoffizielle Anwendung**: CiupWifi ist ein unabhängiges Gemeinschaftsprojekt und steht in keiner offiziellen Verbindung zur Cité internationale universitaire de Paris (CIUP).
+
