@@ -127,6 +127,28 @@ async function init() {
     // 3. Keep connection monitored every 60 seconds while window is open
     if (checkInterval) clearInterval(checkInterval);
     checkInterval = setInterval(checkAndAutoLogin, 60_000);
+
+    // 4. Quietly check for new release updates in background
+    setTimeout(checkForUpdates, 1500);
+}
+
+let pendingUpdate = null;
+
+async function checkForUpdates() {
+    try {
+        const update = await invoke('check_for_updates');
+        if (update) {
+            pendingUpdate = update;
+            const banner = document.getElementById('update-banner');
+            const text = document.getElementById('update-text');
+            if (banner && text) {
+                text.textContent = `✨ v${update.latest_version} available!`;
+                banner.style.display = 'flex';
+            }
+        }
+    } catch (e) {
+        console.log('[CiupWifi] Update check:', e);
+    }
 }
 
 // Event Bindings
@@ -146,6 +168,23 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     invoke('setup_background_task', { enable: false }).catch(() => {});
     showLogin();
     clearStatus();
+});
+document.getElementById('btn-update').addEventListener('click', async () => {
+    if (!pendingUpdate) return;
+    const btn = document.getElementById('btn-update');
+    btn.disabled = true;
+    btn.textContent = 'Updating…';
+
+    try {
+        await invoke('download_and_install_update', {
+            downloadUrl: pendingUpdate.download_url,
+            assetName: pendingUpdate.asset_name,
+        });
+    } catch (e) {
+        setStatus(`Update failed: ${e}`, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Retry';
+    }
 });
 
 init();

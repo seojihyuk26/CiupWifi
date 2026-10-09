@@ -28,3 +28,4 @@ iOS에서는 시스템 정책상 독립 앱 대신 Safari 확장 프로그램을
 * 모든 계정 정보는 외부 서버로 전송되지 않으며, 사용자 브라우저의 `GM_setValue` 로컬 스토리지에만 저장됩니다.
 * 요청은 오직 기숙사 내부 로그인 게이트웨이(`10.254.0.254`)로만 전송됩니다.
 * 소스코드 및 GitHub 저장소: [https://github.com/seojihyuk26/CiupWifi](https://github.com/seojihyuk26/CiupWifi)
+

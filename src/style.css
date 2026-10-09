@@ -68,3 +68,32 @@ h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
 .stat strong { color: #1e293b; }
 
 .hint { color: #94a3b8; font-size: 11px; margin-top: 14px; }
+
+/* ── Auto-update banner ── */
+.update-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  gap: 8px;
+}
+.btn-update {
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-update:hover { background: #1d4ed8; }
+.btn-update:disabled { background: #93c5fd; cursor: not-allowed; }

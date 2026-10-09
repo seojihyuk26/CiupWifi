@@ -9,6 +9,8 @@ pub fn run() {
             crate::commands::save_credentials,
             crate::commands::load_credentials,
             crate::commands::setup_background_task,
+            crate::commands::check_for_updates,
+            crate::commands::download_and_install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -359,5 +361,161 @@ pub mod commands {
         }
 
         Ok(())
+    }
+
+    #[derive(serde::Serialize, serde::Deserialize, Clone)]
+    pub struct UpdateInfo {
+        pub current_version: String,
+        pub latest_version: String,
+        pub download_url: String,
+        pub asset_name: String,
+        pub release_notes: String,
+    }
+
+    fn parse_version_parts(v: &str) -> Vec<u32> {
+        v.trim_start_matches('v')
+            .trim()
+            .split('.')
+            .filter_map(|s| s.parse::<u32>().ok())
+            .collect()
+    }
+
+    fn is_newer_version(latest: &str, current: &str) -> bool {
+        let l_parts = parse_version_parts(latest);
+        let c_parts = parse_version_parts(current);
+        for (l, c) in l_parts.iter().zip(c_parts.iter()) {
+            if l > c { return true; }
+            if l < c { return false; }
+        }
+        l_parts.len() > c_parts.len()
+    }
+
+    #[tauri::command]
+    pub async fn check_for_updates() -> Result<Option<UpdateInfo>, String> {
+        let current_version = env!("CARGO_PKG_VERSION");
+        let client = Client::builder()
+            .user_agent("CiupWifi-App")
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .map_err(|e| e.to_string())?;
+
+        let resp = match client
+            .get("https://api.github.com/repos/seojihyuk26/CiupWifi/releases/latest")
+            .send()
+            .await
+        {
+            Ok(r) if r.status().is_success() => r,
+            _ => return Ok(None),
+        };
+
+        let text = match resp.text().await {
+            Ok(t) => t,
+            Err(_) => return Ok(None),
+        };
+
+        let json: serde_json::Value = match serde_json::from_str(&text) {
+            Ok(v) => v,
+            Err(_) => return Ok(None),
+        };
+
+        let tag = json.get("tag_name").and_then(|t| t.as_str()).unwrap_or("");
+        let latest_version = tag.trim_start_matches('v').to_string();
+
+        if !is_newer_version(&latest_version, current_version) {
+            return Ok(None);
+        }
+
+        let body = json.get("body").and_then(|b| b.as_str()).unwrap_or("").to_string();
+        let assets = json.get("assets").and_then(|a| a.as_array());
+
+        let mut download_url = String::new();
+        let mut asset_name = String::new();
+
+        if let Some(assets) = assets {
+            for asset in assets {
+                let name = asset.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                let url = asset.get("browser_download_url").and_then(|u| u.as_str()).unwrap_or("");
+
+                #[cfg(target_os = "windows")]
+                if name.ends_with(".exe") {
+                    download_url = url.to_string();
+                    asset_name = name.to_string();
+                    break;
+                }
+
+                #[cfg(target_os = "macos")]
+                if name.ends_with(".dmg") {
+                    download_url = url.to_string();
+                    asset_name = name.to_string();
+                    break;
+                }
+
+                #[cfg(target_os = "android")]
+                if name.ends_with(".apk") {
+                    download_url = url.to_string();
+                    asset_name = name.to_string();
+                    break;
+                }
+
+                #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android")))]
+                if name.ends_with(".tar.gz") || name.ends_with(".deb") || name.ends_with(".AppImage") {
+                    download_url = url.to_string();
+                    asset_name = name.to_string();
+                    break;
+                }
+            }
+        }
+
+        if download_url.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(UpdateInfo {
+            current_version: current_version.to_string(),
+            latest_version,
+            download_url,
+            asset_name,
+            release_notes: body,
+        }))
+    }
+
+    #[tauri::command]
+    pub async fn download_and_install_update(download_url: String, asset_name: String) -> Result<String, String> {
+        let client = Client::builder()
+            .user_agent("CiupWifi-App")
+            .timeout(std::time::Duration::from_secs(120))
+            .build()
+            .map_err(|e| e.to_string())?;
+
+        let bytes = client
+            .get(&download_url)
+            .send()
+            .await
+            .map_err(|e| format!("Download failed: {}", e))?
+            .bytes()
+            .await
+            .map_err(|e| format!("Reading download data failed: {}", e))?;
+
+        let temp_file = std::env::temp_dir().join(&asset_name);
+        std::fs::write(&temp_file, &bytes)
+            .map_err(|e| format!("Saving update file failed: {}", e))?;
+
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new(&temp_file).spawn();
+            std::process::exit(0);
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("open").arg(&temp_file).spawn();
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            let _ = &temp_file;
+        }
+
+        Ok(format!("Update downloaded to {:?}", temp_file))
     }
 }
