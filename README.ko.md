@@ -48,9 +48,26 @@
 | 운영체제 | 설치 파일 | 안내 |
 |---|---|---|
 | **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (또는 `.msi`) | 표준 Windows 인스톨러입니다.<br>*(PC 보호 경고 창 발생 시: **추가 정보** 클릭 > **실행**)* |
-| **macOS** | `CiupWifi_x.x.x_universal.dmg` | 파일을 열고 `CiupWifi.app`을 응용 프로그램으로 드래그합니다.<br>*(보안 경고 시: 우클릭 > **열기**)* |
+| **macOS** | `CiupWifi_x.x.x_universal.dmg` | 파일을 열고 `CiupWifi.app`을 응용 프로그램으로 드래그합니다.<br>*(보안 경고 시 아래 macOS 가이드 참조)* |
 | **Android** | `CiupWifi.apk` | 안드로이드 스마트폰/태블릿용 서명된 APK 설치 파일입니다. |
 | **iOS / iPadOS** | [**Greasy Fork (원클릭 설치)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Safari의 [Userscripts 확장](https://apps.apple.com/app/userscripts/id1463298887) 또는 [Orion Browser](https://kagi.com/orion/)에서 1초 만에 설치 및 자동 업데이트가 지원됩니다. |
+
+### 🍏 macOS 보안 경고 해결법 ("악성 코드 확인할 수 없음")
+
+macOS는 애플 개발자 등록($99/년)을 거치지 않은 오픈소스 앱을 인터넷에서 다운로드할 경우 Gatekeeper 보안 정책에 의해 *"Apple은 사용자의 Mac을 손상시키거나 개인정보에 침입할 수 있는 악성 코드가 없다고 확인할 수 없습니다"* 경고창을 띄웁니다. 아래 두 가지 방법 중 하나로 1초 만에 해결할 수 있습니다:
+
+#### ⚡ 방법 1: 터미널 명령어 1줄 실행 (가장 추천, 영구 해제)
+터미널(Terminal)을 열고 아래 명령어를 입력한 뒤 Enter를 누릅니다:
+```bash
+xattr -cr /Applications/CiupWifi.app
+```
+> macOS가 다운로드 파일에 부여한 격리 플래그(`com.apple.quarantine`)를 즉시 제거하여, 이후부터는 일반 앱처럼 더블클릭으로 바로 열립니다.
+
+#### ⚙️ 방법 2: 시스템 설정에서 "확인 없이 열기" (GUI)
+1. 경고창에서 **[완료]** 또는 **[취소]**를 누릅니다.
+2. Mac **시스템 설정 (System Settings)** → **개인정보 보호 및 보안 (Privacy & Security)**으로 이동합니다.
+3. 화면 아래로 스크롤하여 **보안** 섹션에서 *"CiupWifi" 사용이 차단되었습니다* 옆의 **[확인 없이 열기] (Open Anyway)** 버튼을 클릭합니다.
+4. 비밀번호 또는 Touch ID를 인증하면 정상 실행됩니다.
 
 ### 📱 iOS / iPadOS 사용 가이드 (Safari / Orion)
 

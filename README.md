@@ -48,9 +48,26 @@ Official binary packages are available on the **[Releases](https://github.com/se
 | Platform | Package | Notes |
 |---|---|---|
 | **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (or `.msi`) | Standard Windows installer.<br>*(If SmartScreen prompt appears: click **More info** > **Run anyway**)* |
-| **macOS** | `CiupWifi_x.x.x_universal.dmg` | Drag `CiupWifi.app` to Applications.<br>*(On Gatekeeper prompt: right-click > **Open**)* |
+| **macOS** | `CiupWifi_x.x.x_universal.dmg` | Drag `CiupWifi.app` to Applications.<br>*(If security warning appears, see guide below)* |
 | **Android** | `CiupWifi.apk` | Signed APK package for Android devices. |
 | **iOS / iPadOS** | [**Greasy Fork (1-Click Install)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Run via [Userscripts for Safari](https://apps.apple.com/app/userscripts/id1463298887) or [Orion Browser](https://kagi.com/orion/). Supports 1-click install & auto-updates. |
+
+### 🍏 macOS Security Notice ("Apple cannot check for malware")
+
+macOS Gatekeeper blocks non-notarized open-source binaries downloaded from web browsers by default. If you see *"Apple cannot verify that this app is free of malware"*, resolve it in 1 second using either method:
+
+#### ⚡ Method 1: Terminal Command (Recommended, Permanent)
+Open **Terminal** and run:
+```bash
+xattr -cr /Applications/CiupWifi.app
+```
+> This strips the browser download quarantine attribute (`com.apple.quarantine`), allowing the app to launch directly on double-click from then on.
+
+#### ⚙️ Method 2: System Settings (GUI)
+1. Click **Done** or **Cancel** on the alert dialog.
+2. Go to **System Settings** → **Privacy & Security**.
+3. Scroll down to the **Security** section where you will see *"CiupWifi was blocked from use"*. Click **[Open Anyway]**.
+4. Authenticate with Touch ID or your Mac password.
 
 ### 📱 iOS / iPadOS Setup Guide (Safari / Orion)
 

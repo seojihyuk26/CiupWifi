@@ -41,10 +41,24 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'CiupWifi ${{ github.ref_name }}'
-          releaseBody: 'CIUP WiFi Auto-login App (Windows, macOS, Android)'
+          releaseBody: |
+            ### 📶 CiupWifi Release ${{ github.ref_name }}
+            Auto-login and session renewal app for CIUP Campus "WifiCity" network.
+
+            #### 📦 Downloads & Instructions:
+            - **Windows**: `CiupWifi_*_x64-setup.exe` (SmartScreen: More Info -> Run Anyway)
+            - **macOS**: `CiupWifi_*_universal.dmg` (If blocked: Run `xattr -cr /Applications/CiupWifi.app` in Terminal or open System Settings -> Privacy & Security -> Open Anyway)
+            - **Android**: `CiupWifi.apk`
+            - **iOS / iPadOS**: [Greasy Fork Userscript](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script)
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
