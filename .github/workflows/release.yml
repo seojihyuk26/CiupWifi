@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -61,27 +62,25 @@ jobs:
           node-version: 22
 
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Licenses & Install NDK
+      - name: Setup Android SDK & NDK
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "ndk;27.0.12077973" "build-tools;34.0.0" "platforms;android-34"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "build-tools;34.0.0" "platforms;android-34"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
 
       - name: Setup Rust + Android targets
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: >
-            aarch64-linux-android,
-            armv7-linux-androideabi,
-            i686-linux-android,
-            x86_64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
 
       - name: Install cargo-ndk
         run: cargo install cargo-ndk
@@ -90,23 +89,37 @@ jobs:
         run: npm ci
 
       - name: Init Tauri Android project
-        run: npx tauri android init
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+        run: npx tauri android init --ci
 
       - name: Build Android APK
         run: npx tauri android build --apk
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+
+      - name: Sign APKs
+        run: |
+          keytool -genkeypair -v -keystore release.keystore -alias ciupwifi -keyalg RSA -keysize 2048 -validity 10000 -storepass ciupwifipass -keypass ciupwifipass -dname "CN=CiupWifi, O=CIUP, C=FR"
+          mkdir -p release-apks
+          shopt -s globstar nullglob
+          for apk in src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk; do
+            filename=$(basename "$apk")
+            if [[ "$filename" == *"unsigned"* ]]; then
+              signed_name="${filename/-unsigned/}"
+              $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:ciupwifipass --key-pass pass:ciupwifipass --out "release-apks/$signed_name" "$apk"
+            else
+              cp "$apk" "release-apks/$filename"
+            fi
+          done
+          for apk in release-apks/*universal*.apk release-apks/*arm64-v8a*.apk release-apks/*.apk; do
+            if [ -f "$apk" ]; then
+              cp "$apk" release-apks/CiupWifi.apk
+              break
+            fi
+          done
+          ls -la release-apks/
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
-            src-tauri/gen/android/app/build/outputs/apk/*/release/*.apk
+          files: release-apks/*.apk
           tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
