@@ -56,9 +56,9 @@ jobs:
 
             #### 📦 Downloads & Instructions:
             - **Windows**: `CiupWifi_*_x64-setup.exe` (SmartScreen: More Info -> Run Anyway)
-            - **macOS**: `CiupWifi_*_universal.dmg` (If blocked: Run `xattr -cr /Applications/CiupWifi.app` in Terminal or open System Settings -> Privacy & Security -> Open Anyway)
+            - **macOS**: `CiupWifi_*_universal.dmg` (Gatekeeper: System Settings -> Privacy & Security -> Open Anyway)
             - **Android**: `CiupWifi.apk`
-            - **iOS / iPadOS**: [Greasy Fork Userscript](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script)
+            - **iOS / iPadOS / Web**: [Greasy Fork Userscript](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script)
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

@@ -52,22 +52,19 @@ Official binary packages are available on the **[Releases](https://github.com/se
 | **Android** | `CiupWifi.apk` | Signed APK package for Android devices. |
 | **iOS / iPadOS** | [**Greasy Fork (1-Click Install)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Run via [Userscripts for Safari](https://apps.apple.com/app/userscripts/id1463298887) or [Orion Browser](https://kagi.com/orion/). Supports 1-click install & auto-updates. |
 
-### 🍏 macOS Security Notice ("Apple cannot check for malware")
+### 🍏 macOS Installation Guide (Official Apple Procedure)
 
-macOS Gatekeeper blocks non-notarized open-source binaries downloaded from web browsers by default. If you see *"Apple cannot verify that this app is free of malware"*, resolve it in 1 second using either method:
+macOS Gatekeeper displays an unidentified developer prompt for open-source applications that are not signed with a paid Apple Developer Account ($99/yr). You can run CiupWifi safely without compromising your Mac's security:
 
-#### ⚡ Method 1: Terminal Command (Recommended, Permanent)
-Open **Terminal** and run:
-```bash
-xattr -cr /Applications/CiupWifi.app
-```
-> This strips the browser download quarantine attribute (`com.apple.quarantine`), allowing the app to launch directly on double-click from then on.
-
-#### ⚙️ Method 2: System Settings (GUI)
+#### 🛡️ Method 1: Apple Official System Settings Authorization (GUI)
+This is Apple's official recommended procedure for running open-source software without modifying system security or Gatekeeper:
 1. Click **Done** or **Cancel** on the alert dialog.
 2. Go to **System Settings** → **Privacy & Security**.
-3. Scroll down to the **Security** section where you will see *"CiupWifi was blocked from use"*. Click **[Open Anyway]**.
-4. Authenticate with Touch ID or your Mac password.
+3. Scroll down to the **Security** section and find *"CiupWifi was blocked from use"*. Click **[Open Anyway]**.
+4. Authenticate with Touch ID or your Mac password to grant permission specifically for CiupWifi.
+
+#### 🌐 Method 2: Zero-Install Alternative (Browser Userscript)
+If you prefer not to install standalone desktop binaries or approve security exceptions, you can use our [**Greasy Fork Userscript**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) directly inside Safari, Chrome, or Firefox. It runs **100% within the browser sandbox** with zero app permissions.
 
 ### 📱 iOS / iPadOS Setup Guide (Safari / Orion)
 
