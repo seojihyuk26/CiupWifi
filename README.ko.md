@@ -47,9 +47,9 @@
 
 | 운영체제 | 설치 파일 | 안내 |
 |---|---|---|
-| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (또는 `.msi`) | 표준 Windows 인스톨러입니다. |
+| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (또는 `.msi`) | 표준 Windows 인스톨러입니다.<br>*(PC 보호 경고 창 발생 시: **추가 정보** 클릭 > **실행**)* |
 | **macOS** | `CiupWifi_x.x.x_universal.dmg` | 파일을 열고 `CiupWifi.app`을 응용 프로그램으로 드래그합니다.<br>*(보안 경고 시: 우클릭 > **열기**)* |
-| **Android** | `app-universal-release-unsigned.apk` | 안드로이드 기기용 독립 실행 APK 파일입니다. |
+| **Android** | `CiupWifi.apk` | 안드로이드 스마트폰/태블릿용 서명된 APK 설치 파일입니다. |
 | **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (유저스크립트) | [Orion Browser](https://kagi.com/orion/) 또는 Safari의 [Userscripts 확장](https://apps.apple.com/app/userscripts/id1463298887)에 `wifiLogin.js`를 등록하여 사용합니다. |
 
 ---

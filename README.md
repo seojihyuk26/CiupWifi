@@ -47,9 +47,9 @@ Official binary packages are available on the **[Releases](https://github.com/se
 
 | Platform | Package | Notes |
 |---|---|---|
-| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (or `.msi`) | Standard Windows installer. Runs from Start menu. |
+| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (or `.msi`) | Standard Windows installer.<br>*(If SmartScreen prompt appears: click **More info** > **Run anyway**)* |
 | **macOS** | `CiupWifi_x.x.x_universal.dmg` | Drag `CiupWifi.app` to Applications.<br>*(On Gatekeeper prompt: right-click > **Open**)* |
-| **Android** | `app-universal-release-unsigned.apk` | Standalone APK package for Android devices. |
+| **Android** | `CiupWifi.apk` | Signed APK package for Android devices. |
 | **iOS / iPadOS** | [`wifiLogin.js`](wifiLogin.js) (Userscript) | Run via [Orion Browser](https://kagi.com/orion/) or [Userscripts for Safari](https://apps.apple.com/app/userscripts/id1463298887). |
 
 ---
