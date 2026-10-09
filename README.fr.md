@@ -5,81 +5,79 @@
 </p>
 
 <p align="center">
-  <b>Connexion automatique au réseau Wi-Fi "WifiCity" de la Cité internationale universitaire de Paris (CIUP).</b><br>
-  <i>Restez connecté sans devoir retaper vos identifiants à longueur de journée.</i>
+  <b>Connexion automatique et maintien de session pour le réseau Wi-Fi "WifiCity" de la Cité internationale universitaire de Paris (CIUP).</b><br>
+  <i>Restez connecté sans devoir ressaisir vos identifiants à chaque coupure.</i>
 </p>
 
 <p align="center">
   <a href="README.md">English</a> •
   <a href="README.fr.md"><b>Français</b></a> •
   <a href="README.es.md">Español</a> •
+  <a href="README.it.md">Italiano</a> •
+  <a href="README.pt.md">Português</a> •
+  <a href="README.de.md">Deutsch</a> •
+  <a href="README.ja.md">日本語</a> •
   <a href="README.zh.md">中文</a> •
-  <a href="README.ko.md">한국어</a> •
-  <a href="README.de.md">Deutsch</a>
+  <a href="README.ko.md">한국어</a>
 </p>
 
 > [!WARNING]
-> **Information importante (Application non officielle)** : Il s'agit d'un utilitaire communautaire indépendant développé par un étudiant résident. Cette application n'est **PAS** officielle et n'est en aucun cas affiliée à l'administration ou à la DSI de la Cité internationale universitaire de Paris (CIUP).
+> **Application non officielle** : Développée de manière indépendante par un étudiant résident, sans affiliation avec l'administration ou la DSI de la CIUP.
 
 ---
 
-## 🤔 À quoi sert cette application ? (Objectif)
+## 📥 Téléchargement (Dernière version)
 
-Si vous habitez à la CIUP et utilisez le Wi-Fi de la cité (**WifiCity**), vous connaissez bien ce problème :
-- Toutes les quelques heures, la session expire et la connexion se coupe.
-- Vous devez ouvrir votre navigateur, attendre que la page de connexion s'affiche et retaper votre identifiant et votre mot de passe.
-- En plein appel vidéo, révision ou streaming, internet se coupe brutalement.
+Téléchargez l'application depuis la page **[Releases GitHub](https://github.com/seojihyuk26/CiupWifi/releases/latest)** :
 
-**CiupWifi résout ce problème une bonne fois pour toutes.**  
-Une fois installée, l'application tourne discrètement en arrière-plan sur votre ordinateur ou votre téléphone. Elle vous connecte automatiquement au Wi-Fi et anticipe l'expiration pour renouveler votre connexion *avant* qu'elle ne soit coupée.
-
----
-
-## 🚀 Comment l'utiliser ? (En 3 étapes simples)
-
-La configuration ne prend que **30 secondes**, une seule fois :
-
-1. **Connectez-vous** au réseau Wi-Fi de la résidence nommé **WifiCity**.
-2. **Ouvrez l'application CiupWifi**, entrez votre **Identifiant** et votre **Mot de passe** de campus, puis cliquez sur **Connect**.
-3. **C'est terminé !** Vous pouvez fermer la fenêtre.
-   - Sur PC/Mac, l'application reste active discrètement dans la barre des tâches (icône près de l'horloge).
-   - Dès que votre session s'apprête à expirer, l'application la renouvelle automatiquement sans vous déranger.
-
----
-
-## 📥 Téléchargement
-
-Téléchargez la version correspondant à votre appareil depuis la **[Page des versions GitHub](https://github.com/seojihyuk26/CiupWifi/releases/latest)** :
-
-| Votre appareil | Fichier à télécharger | Installation facile |
+| Plateforme | Fichier | Instructions |
 |---|---|---|
-| **Ordinateur Windows** | `CiupWifi_x.x.x_x64-setup.exe` | Téléchargez, double-cliquez pour installer et lancez l'application. |
-| **Mac (Apple)** | `CiupWifi_x.x.x_universal.dmg` | Ouvrez le fichier et glissez `CiupWifi` dans votre dossier Applications.<br>*(Si un message de sécurité apparaît : clic droit sur l'icône > **Ouvrir**)* |
-| **Téléphone Android** | `CiupWifi.apk` | Téléchargez et installez le fichier APK sur votre smartphone. |
-| **iPhone / iPad** | [**Greasy Fork (Installation en 1 clic)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Installez via [Userscripts pour Safari](https://apps.apple.com/app/userscripts/id1463298887) ou [Orion Browser](https://kagi.com/orion/). Prise en charge de l'installation et des mises à jour automatiques. |
+| **Windows** | `CiupWifi_*_x64-setup.exe` | Exécutez l'installateur. (Si SmartScreen apparaît : **Informations complémentaires** → **Exécuter quand même**) |
+| **macOS** | `CiupWifi_*_universal.dmg` | Glissez dans `Applications`. (Si bloqué : **Réglages Système** → **Sécurité** → **Ouvrir quand même**) |
+| **Android** | `CiupWifi.apk` | Fichier APK signé pour smartphones et tablettes. |
+| **iOS / iPadOS / Mac** | [**Userscript Greasy Fork**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) | Installation en 1 clic dans Safari ([Userscripts](https://apps.apple.com/app/userscripts/id1463298887)) ou Orion. |
 
 ---
 
-## 🔒 Mon mot de passe est-il en sécurité ?
+## 🚀 Utilisation (En 30 secondes)
 
-**Oui, absolument.**
-- Vos identifiants sont enregistrés **uniquement sur votre propre appareil**.
-- Aucune donnée n'est envoyée à des serveurs tiers ou au créateur de l'application.
-- L'application communique exclusivement et directement avec la page de connexion de la cité (`10.254.0.254`).
-- Le projet est entièrement gratuit, open-source et transparent.
-
----
-
-## 🙏 Remerciements et Références
-
-Ce projet s'inspire directement des travaux et analyses préalables menés par la communauté étudiante de la CIUP :
-- **[Thomas-dd3/WifiCity_captiveportal](https://github.com/Thomas-dd3/WifiCity_captiveportal)** : Travail remarquable sur les scripts d'automatisation Windows et Linux ayant mis en lumière le port `1000` et les jetons de sécurité `magic` de FortiGate.
-- **[Gist de Ranadeep Biswas](https://gist.github.com/rnbguy/6f574caa6b3535162a20750cb1777a09)** : Script shell Linux original pour la connexion WifiCity.
-
-CiupWifi transforme ces découvertes techniques en une application graphique moderne et accessible à tous les résidents.
+1. Connectez-vous au Wi-Fi **WifiCity**.
+2. Ouvrez **CiupWifi**, entrez votre **identifiant/mot de passe** du campus, puis cliquez sur **Connect**.
+3. **Vous pouvez fermer la fenêtre (`[X]`).**
+   - Le renouvellement automatique est configuré dans le planificateur de tâches de l'OS (Windows / macOS).
+   - Ne reste pas en tâche de fond inutilement : s'exécute en 0,3s seulement quand nécessaire (**0 Mo de RAM au repos**).
 
 ---
 
-## 📄 Licence
+## 🛡️ Avertissements de sécurité au premier lancement (Windows / macOS / Android)
 
-Distribué sous licence libre [MIT](LICENSE).
+En tant qu'utilitaire open-source indépendant sans certificat d'entreprise payant, les systèmes d'exploitation peuvent afficher un avertissement au premier lancement. Voici la procédure officielle pour chaque système :
+
+* **🪟 Windows (SmartScreen)** :
+  - Si *"Windows a protégé votre ordinateur"* s'affiche : cliquez sur **[Informations complémentaires]** → **[Exécuter quand même]**.
+* **🍏 macOS (Gatekeeper)** :
+  - Si bloqué : cliquez sur **[Annuler]** → ouvrez **[Réglages Système]** → **[Confidentialité et sécurité]** → sous Sécurité, cliquez sur **[Ouvrir quand même]** → authentifiez-vous.
+* **🤖 Android (Google Play Protect)** :
+  - Si l'installation est bloquée : touchez **[Détails]** (∨) → touchez **[Installer quand même]** (ou autorisez *Installation d'applications inconnues* dans votre navigateur).
+* **🌐 Alternative sans installation (Userscript navigateur)** :
+  - Si vous préférez ne pas configurer d'exceptions de sécurité, utilisez notre [**Userscript Greasy Fork**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) dans Safari, Chrome ou Firefox. Il s'exécute à 100% dans le bac à sable du navigateur.
+
+---
+
+## 🔒 Confidentialité & Sécurité
+
+* **100% Local** : Vos identifiants restent stockés uniquement sur votre machine.
+* **Passerelle locale uniquement** : Communique uniquement avec la passerelle locale du campus (`10.254.0.254`).
+* **Open Source** : Aucune télémétrie ni collecte de données.
+
+---
+
+## 💻 Compilation
+
+```bash
+npm install
+npm run dev      # Mode développement
+npm run build    # Compiler les paquets
+```
+
+Licence MIT

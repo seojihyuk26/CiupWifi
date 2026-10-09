@@ -5,90 +5,79 @@
 </p>
 
 <p align="center">
-  <b>巴黎国际大学城 (CIUP) “WifiCity” 校园无线网络自动登录与会话保持工具。</b>
+  <b>巴黎国际大学城 (CIUP) "WifiCity" 校园无线网络自动登录与重连工具</b><br>
+  <i>无需反复输入账号密码，网络断开时自动静默重连。</i>
 </p>
 
 <p align="center">
   <a href="README.md">English</a> •
   <a href="README.fr.md">Français</a> •
   <a href="README.es.md">Español</a> •
+  <a href="README.it.md">Italiano</a> •
+  <a href="README.pt.md">Português</a> •
+  <a href="README.de.md">Deutsch</a> •
+  <a href="README.ja.md">日本語</a> •
   <a href="README.zh.md"><b>中文</b></a> •
-  <a href="README.ko.md">한국어</a> •
-  <a href="README.de.md">Deutsch</a>
+  <a href="README.ko.md">한국어</a>
 </p>
 
 > [!WARNING]
-> **免责声明**：本软件为住户学生自主开发的独立开源辅助工具。**绝非**巴黎国际大学城 (CIUP) 官方应用，且与大学城管理层或网络信息部门无任何隶属关系。
+> **非官方说明**：本软件是由大学城住宿学生独立开发的开源工具，与 CIUP 校方管理处或 IT 部门无官方关联。
 
 ---
 
-## 概述
+## 📥 下载安装（最新版本）
 
-巴黎国际大学城 (CIUP) 的校园 Wi-Fi 网络 (**WifiCity**) 设有定期的强制门户超时机制，导致住户每天必须多次重新在浏览器中输入账号密码进行身份验证。
+请从 **[GitHub Releases 页面](https://github.com/seojihyuk26/CiupWifi/releases/latest)** 下载对应系统的安装包：
 
-**CiupWifi** 旨在自动化此流程：
-- 后台静默完成认证，无需弹出任何浏览器窗口。
-- 跟踪实际网络会话有效时长，并在断线前主动提前续期。
-- 最小化常驻系统托盘，内存占用极低（< 15 MB）。
-
----
-
-## 使用方法
-
-1. 将设备连接至大学城 **WifiCity** 无线网络。
-2. 打开 **CiupWifi**，输入您的大学城账号与密码，点击 **Connect**。
-3. 关闭窗口即可。程序会常驻任务栏托盘，并在后台自动处理后续的所有登录与超时续期。
-
----
-
-## 下载安装
-
-安装包可在 **[GitHub Releases 页面](https://github.com/seojihyuk26/CiupWifi/releases/latest)** 获取：
-
-| 操作系统 | 安装包文件 | 说明 |
+| 平台 | 安装文件 | 说明 |
 |---|---|---|
-| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (或 `.msi`) | 标准 Windows 安装包，可在开始菜单启动。 |
-| **macOS** | `CiupWifi_x.x.x_universal.dmg` | 将 `CiupWifi.app` 拖入 Applications 目录。<br>*(若出现安全提示：右键点击图标 > 选择 **打开**)* |
-| **Android** | `CiupWifi.apk` | 适用于安卓设备的独立 APK 安装包。 |
-| **iOS / iPadOS** | [**Greasy Fork (一键安装)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | 可在 iOS 上通过 Safari [Userscripts 扩展](https://apps.apple.com/app/userscripts/id1463298887) 或 [Orion Browser](https://kagi.com/orion/) 一键安装并支持自动更新。 |
+| **Windows** | `CiupWifi_*_x64-setup.exe` | 标准安装包（若弹出 SmartScreen 保护：点击 **更多信息** → **仍要运行**） |
+| **macOS** | `CiupWifi_*_universal.dmg` | 拖入 `Applications`（若提示已阻止：**系统设置** → **隐私与安全性** → **仍要打开**） |
+| **Android** | `CiupWifi.apk` | 安卓手机及平板专用 APK 安装包 |
+| **iOS / iPadOS / Mac** | [**Greasy Fork 脚本**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) | Safari（[Userscripts 扩展](https://apps.apple.com/app/userscripts/id1463298887)）或 Orion 浏览器 1 秒快速安装 |
 
 ---
 
-## 隐私与安全
+## 🚀 使用方法（30秒完成）
 
-- **仅限本地存储**：登录凭据仅保存在本机操作系统的应用数据目录中。
-- **直接网关通信**：请求仅直接发送至大学城内部网关地址 (`10.254.0.254`)。
-- **无数据回传**：不包含任何数据埋点、统计或第三方服务器交互。
-- **全开源透明**：全部源代码均公开以供安全审查。
-
----
-
-## 技术实现与架构
-
-供开发者及感兴趣的用户参考的技术细节：
-
-### 1. 原生直接 HTTP 认证
-与在 WebView 或浏览器中注入脚本不同，CiupWifi 采用轻量 Rust 后端（基于 `reqwest`）：
-- 探测 `http://www.google.com/gen_204` 以识别强制网络跳转。
-- 拦截重定向至 FortiGate 网关接口（`http://10.254.0.254:1000/fgtauth?...`）。
-- 提取动态会话认证凭证（`magic`），并提交双重兼容的表单参数（`ft_un`/`username`, `ft_pd`/`password`, `magic`）。
-- 通过后续的 HTTP 204 请求验证连通性是否真正恢复。
-
-### 2. 主动定时重连机制
-- 过滤掉睡眠或临时掉线等干扰，仅记录**持续 1 小时以上的正常会话**（最多保留最近 3 次）。
-- 以这些有效记录中的**最短持续时间（最小值）**为基准，在预计到期前 5 分钟提前自动续期。
-- 主动发起的重连不会计入自然断线历史，以保持基准时间准确。
+1. 将设备连接至宿舍 Wi-Fi **WifiCity**。
+2. 打开 **CiupWifi**，输入校园网 **账号与密码**，点击 **Connect**。
+3. **连接成功后可直接关闭窗口（`[X]`）。**
+   - 自动在操作系统任务计划程序（Windows/Mac）中注册后台无感知重连任务。
+   - 仅在网络掉线时后台 0.3 秒静默重连，**日常空闲内存占用接近 0 MB**。
 
 ---
 
-## 致谢与参考项目
+## 🛡️ 首次运行安全提示（Windows / macOS / Android）
 
-本项目深受 CIUP 学生社区先期技术探索的启发：
-- **[Thomas-dd3/WifiCity_captiveportal](https://github.com/Thomas-dd3/WifiCity_captiveportal)**：发现了 FortiGate 系统的 `1000` 端口以及 `magic` 认证参数，并提供了实用的 Windows/Linux 命令行脚本。
-- **[Ranadeep Biswas (rnbguy)](https://gist.github.com/rnbguy/6f574caa6b3535162a20750cb1777a09)**：最初用于 Linux 系统的 WifiCity 登录脚本原型。
+作为无企业付费数字签名的独立开源软件，各系统在首次启动时可能会弹出拦截提示。通过官方步骤即可安全运行：
+
+* **🪟 Windows (SmartScreen)**：
+  - 弹出 *"Windows 已保护你的电脑"* 时：点击 **[更多信息]** → **[仍要运行]**。
+* **🍏 macOS (Gatekeeper)**：
+  - 若提示已阻止：点击 **[取消]** → 打开 Mac **[系统设置]** → **[隐私与安全性]** → 在安全性区域点击 **[仍要打开]** → 验证密码或指纹。
+* **🤖 Android (Google Play 保护机制)**：
+  - 若拦截安装：点击 **[了解详情]** (∨) → 点击 **[仍要安装]**（或在浏览器中开启 *允许安装未知应用*）。
+* **🌐 免安装方案（浏览器脚本）**：
+  - 若不想在系统中配置安全例外，可直接在 Safari、Chrome、Firefox 中使用我们的 [**Greasy Fork 脚本**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1)，100% 在浏览器沙箱内无权限运行。
 
 ---
 
-## 开源许可证
+## 🔒 隐私与安全性
 
-遵循 [MIT 许可证](LICENSE) 发布。
+* **100% 本地保存**：账号信息仅保存在本设备本地，绝不上发至任何外部服务器。
+* **仅直连本地网关**：仅与宿舍内部认证网关（`10.254.0.254`）直接通信。
+* **完全开源无追踪**：无任何数据收集与遥测代码，代码全公开透明。
+
+---
+
+## 💻 源码构建
+
+```bash
+npm install
+npm run dev      # 开发调试
+npm run build    # 打包构建
+```
+
+MIT 许可证

@@ -5,136 +5,79 @@
 </p>
 
 <p align="center">
-  <b>Automatic login and session maintenance utility for the "WifiCity" network at Cité internationale universitaire de Paris (CIUP).</b>
+  <b>Auto-login & session renewal utility for CIUP "WifiCity" campus Wi-Fi network.</b><br>
+  <i>Stay connected without having to manually log in every time the captive portal expires.</i>
 </p>
 
 <p align="center">
   <a href="README.md"><b>English</b></a> •
   <a href="README.fr.md">Français</a> •
   <a href="README.es.md">Español</a> •
+  <a href="README.it.md">Italiano</a> •
+  <a href="README.pt.md">Português</a> •
+  <a href="README.de.md">Deutsch</a> •
+  <a href="README.ja.md">日本語</a> •
   <a href="README.zh.md">中文</a> •
-  <a href="README.ko.md">한국어</a> •
-  <a href="README.de.md">Deutsch</a>
+  <a href="README.ko.md">한국어</a>
 </p>
 
 > [!WARNING]
-> **Disclaimer**: This is an independent, community-developed open-source tool. It is **not** an official application and has no affiliation with or endorsement from the administration or IT services of the Cité internationale universitaire de Paris (CIUP).
+> **Unofficial App**: This is an independent open-source utility developed by a student resident. It is not affiliated with the CIUP administration or IT department.
 
 ---
 
-## Overview
+## 📥 Downloads (Latest Release)
 
-The campus Wi-Fi network at CIUP (**WifiCity**) enforces periodic captive portal session timeouts, requiring residents to repeatedly reopen a web browser and re-authenticate throughout the day.
+Download packages directly from the **[GitHub Releases](https://github.com/seojihyuk26/CiupWifi/releases/latest)** page:
 
-**CiupWifi** automates this workflow:
-- Authenticates in the background without requiring a browser window.
-- Tracks natural session durations and proactively renews the connection before the timeout occurs.
-- Minimizes to the system tray with negligible memory usage (< 15 MB).
-
----
-
-## Usage
-
-1. Connect your device to the **WifiCity** Wi-Fi network.
-2. Launch **CiupWifi**, enter your campus credentials, and click **Connect**.
-3. You can close the window (`[X]`) immediately! The app automatically registers background renewal with your OS (Windows Task Scheduler / macOS LaunchAgent), renewing connectivity silently without eating memory.
-
----
-
-## Downloads
-
-Official binary packages are available on the **[Releases](https://github.com/seojihyuk26/CiupWifi/releases/latest)** page:
-
-| Platform | Package | Notes |
+| Platform | Installer | Setup Notes |
 |---|---|---|
-| **Windows** | `CiupWifi_x.x.x_x64-setup.exe` (or `.msi`) | Standard Windows installer.<br>*(If SmartScreen prompt appears: click **More info** > **Run anyway**)* |
-| **macOS** | `CiupWifi_x.x.x_universal.dmg` | Drag `CiupWifi.app` to Applications.<br>*(If security warning appears, see guide below)* |
-| **Android** | `CiupWifi.apk` | Signed APK package for Android devices. |
-| **iOS / iPadOS** | [**Greasy Fork (1-Click Install)**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) / [`wifiLogin.js`](wifiLogin.js) | Run via [Userscripts for Safari](https://apps.apple.com/app/userscripts/id1463298887) or [Orion Browser](https://kagi.com/orion/). Supports 1-click install & auto-updates. |
-
-### 🍏 macOS Installation Guide (Official Apple Procedure)
-
-macOS Gatekeeper displays an unidentified developer prompt for open-source applications that are not signed with a paid Apple Developer Account ($99/yr). You can run CiupWifi safely without compromising your Mac's security:
-
-#### 🛡️ Method 1: Apple Official System Settings Authorization (GUI)
-This is Apple's official recommended procedure for running open-source software without modifying system security or Gatekeeper:
-1. Click **Done** or **Cancel** on the alert dialog.
-2. Go to **System Settings** → **Privacy & Security**.
-3. Scroll down to the **Security** section and find *"CiupWifi was blocked from use"*. Click **[Open Anyway]**.
-4. Authenticate with Touch ID or your Mac password to grant permission specifically for CiupWifi.
-
-#### 🌐 Method 2: Zero-Install Alternative (Browser Userscript)
-If you prefer not to install standalone desktop binaries or approve security exceptions, you can use our [**Greasy Fork Userscript**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) directly inside Safari, Chrome, or Firefox. It runs **100% within the browser sandbox** with zero app permissions.
-
-### 📱 iOS / iPadOS Setup Guide (Safari / Orion)
-
-Due to iOS sandbox restrictions, iOS and iPadOS devices use a browser Userscript:
-
-1. **Install a Userscript Extension (choose one)**:
-   * **Safari**: Install [Userscripts for Safari](https://apps.apple.com/app/userscripts/id1463298887) from the App Store, then enable it in `Settings > Safari > Extensions`.
-   * **Orion**: Install [Orion Browser](https://kagi.com/orion/) (features native WebExtension support on iOS).
-2. **Install Script**:
-   * Open the [Greasy Fork Script Page](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) and tap **[Install this script]**.
-3. **Connect**:
-   * Log in to the WifiCity captive portal once. The script securely stores credentials locally in your browser and automatically logs you in whenever the portal prompt appears.
+| **Windows** | `CiupWifi_*_x64-setup.exe` | Standard setup. (If SmartScreen appears: **More info** → **Run anyway**) |
+| **macOS** | `CiupWifi_*_universal.dmg` | Drag to `Applications`. (If blocked: **System Settings** → **Security** → **Open Anyway**) |
+| **Android** | `CiupWifi.apk` | Standalone signed APK for Android devices. |
+| **iOS / iPadOS / Mac** | [**Greasy Fork Userscript**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) | Install in Safari via [Userscripts](https://apps.apple.com/app/userscripts/id1463298887) or Orion Browser in 1 second. |
 
 ---
 
-## Privacy & Security
+## 🚀 Quick Start (30 Seconds)
 
-- **Local-Only Storage**: Credentials are saved exclusively on your local device in standard application data storage.
-- **Direct Gateway Communication**: Network requests are sent solely to the local captive portal interface (`10.254.0.254`).
-- **No Telemetry**: No tracking, analytics, or external servers are involved.
-- **Open Source**: Full source code is available for auditing.
-
----
-
-## Technical Details & Architecture
-
-For developers and curious users, here is how CiupWifi operates under the hood:
-
-### 1. Direct Native HTTP Authentication
-Rather than injecting JavaScript into an in-app WebView or browser, CiupWifi utilizes a lightweight Rust backend via `reqwest`:
-- Queries `http://www.google.com/gen_204` to probe for captive network redirection.
-- Intercepts the HTTP 302 redirection to FortiGate portal endpoints (`http://10.254.0.254:1000/fgtauth?...`).
-- Extracts the dynamic session token (`magic`) and submits dual-compatible form payloads (`ft_un`/`username`, `ft_pd`/`password`, `magic`).
-- Verifies successful connectivity via subsequent HTTP 204 responses.
-
-### 2. Proactive Session Renewal
-- Filters out transient noise (such as device sleep or signal drops) by only recording **sessions that lasted at least 1 hour** (retaining the last 3 records).
-- Uses the **minimum duration** among these records as a benchmark and automatically renews connection 5 minutes before that deadline.
-- Proactively renewed sessions are excluded from natural expiration history to keep timing accurate.
+1. Connect your device to the campus Wi-Fi network **WifiCity**.
+2. Launch **CiupWifi**, enter your campus **Username & Password**, and click **Connect**.
+3. **You can close the window immediately (`[X]`).**
+   - Background re-authentication is automatically registered with your OS scheduler (Windows / macOS).
+   - Runs headlessly in ~0.3s only when needed, consuming **virtually 0 MB RAM** when idle.
 
 ---
 
-## References & Credits
+## 🛡️ Security Warnings on First Launch (Windows / macOS / Android)
 
-This project builds upon reverse-engineering and automation work from the CIUP student developer community:
-- **[Thomas-dd3/WifiCity_captiveportal](https://github.com/Thomas-dd3/WifiCity_captiveportal)**: Identified the FortiGate authentication port `1000`, the `magic` token extraction mechanism, and provided initial Windows and Linux CLI scripts.
-- **[Ranadeep Biswas (rnbguy)](https://gist.github.com/rnbguy/6f574caa6b3535162a20750cb1777a09)**: The original Linux shell script prototype for automated WifiCity portal login.
+As an independent open-source utility without enterprise corporate certificates, operating systems may show an unrecognized developer prompt on first launch. You can safely proceed in 1 second using the official procedure for your OS:
+
+* **🪟 Windows (SmartScreen)**:
+  - If *"Windows protected your PC"* appears: click **[More info]** → **[Run anyway]**.
+* **🍏 macOS (Gatekeeper)**:
+  - If blocked: click **[Cancel]** → open Mac **[System Settings]** → **[Privacy & Security]** → scroll down to Security and click **[Open Anyway]** → authenticate.
+* **🤖 Android (Google Play Protect)**:
+  - If blocked: tap **[More details]** (∨) → tap **[Install anyway]** (or enable *Install unknown apps* for your browser).
+* **🌐 Zero-Install Alternative (Browser Userscript)**:
+  - If you prefer not to configure system security exceptions, use our [**Greasy Fork Userscript**](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script?locale_override=1) in Safari, Chrome, or Firefox. It runs 100% inside your browser sandbox with zero permissions.
 
 ---
 
-## Building from Source
+## 🔒 Privacy & Security
 
-### Prerequisites
-- Node.js 20+
-- Rust 1.77+
-- Tauri CLI v2 (`npm install -g @tauri-apps/cli`)
+* **100% Local Storage**: Your credentials are stored exclusively on your device's local storage.
+* **Direct Gateway Only**: Communicates strictly with the campus portal gateway (`10.254.0.254`).
+* **Open Source & Zero Telemetry**: No analytics, no tracking, and fully auditable code.
+
+---
+
+## 💻 Build from Source
 
 ```bash
-# Install dependencies
 npm install
-
-# Run in development mode
-npm run dev
-
-# Build release packages
-npm run build
+npm run dev      # Local dev mode
+npm run build    # Build release packages
 ```
 
----
-
-## License
-
-Distributed under the [MIT License](LICENSE).
+MIT License
