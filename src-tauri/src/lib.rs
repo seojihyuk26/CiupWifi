@@ -92,7 +92,7 @@ pub mod commands {
 
     fn parse_form(html_text: &str) -> (String, HashMap<String, String>) {
         let mut form_data: HashMap<String, String> = HashMap::new();
-        let mut action = "http://10.254.0.254:1000/login".to_string();
+        let mut action = "http://10.254.0.254:1000/".to_string();
 
         if let Some(form_idx) = html_text.to_lowercase().find("<form") {
             let rest = &html_text[form_idx..];
@@ -108,8 +108,10 @@ pub mod commands {
                 if !act.is_empty() {
                     action = if act.starts_with("http") {
                         act.to_string()
-                    } else {
+                    } else if act.starts_with('/') {
                         format!("http://10.254.0.254:1000{}", act)
+                    } else {
+                        format!("http://10.254.0.254:1000/{}", act)
                     };
                 }
             }
@@ -126,21 +128,21 @@ pub mod commands {
             let tag = &html_text[abs_start..tag_end];
             let tag_lower = &lower[abs_start..tag_end];
 
-            if tag_lower.contains("hidden") {
-                let get_attr = |attr_name: &str| -> Option<String> {
-                    let pat = format!("{}=", attr_name);
-                    let idx = tag_lower.find(&pat)?;
-                    let val_str = &tag[idx + pat.len()..];
-                    let q = val_str.chars().next()?;
-                    let (off, len) = if q == '"' || q == '\'' {
-                        (1, val_str[1..].find(q)?)
-                    } else {
-                        (0, val_str.find(|c: char| c.is_whitespace() || c == '>').unwrap_or(val_str.len()))
-                    };
-                    Some(val_str[off..off + len].to_string())
+            let get_attr = |attr_name: &str| -> Option<String> {
+                let pat = format!("{}=", attr_name);
+                let idx = tag_lower.find(&pat)?;
+                let val_str = &tag[idx + pat.len()..];
+                let q = val_str.chars().next()?;
+                let (off, len) = if q == '"' || q == '\'' {
+                    (1, val_str[1..].find(q)?)
+                } else {
+                    (0, val_str.find(|c: char| c.is_whitespace() || c == '>').unwrap_or(val_str.len()))
                 };
+                Some(val_str[off..off + len].to_string())
+            };
 
-                if let (Some(name), Some(val)) = (get_attr("name"), get_attr("value")) {
+            if let (Some(name), Some(val)) = (get_attr("name"), get_attr("value")) {
+                if !name.is_empty() {
                     form_data.insert(name, val);
                 }
             }
@@ -150,66 +152,187 @@ pub mod commands {
         (action, form_data)
     }
 
+    fn extract_redirect_from_html(html: &str) -> Option<String> {
+        let lower = html.to_lowercase();
+        if let Some(idx) = lower.find("http-equiv=\"refresh\"") {
+            if let Some(c_idx) = lower[idx..].find("content=") {
+                let rest = &html[idx + c_idx + 8..];
+                if let Some(u_idx) = rest.to_lowercase().find("url=") {
+                    let url_part = &rest[u_idx + 4..];
+                    let clean = url_part.trim_matches(|c: char| c == '"' || c == '\'' || c == ' ');
+                    let end = clean.find(|c: char| c == '"' || c == '\'' || c == ' ' || c == '>').unwrap_or(clean.len());
+                    let u = &clean[..end];
+                    if !u.is_empty() {
+                        return Some(if u.starts_with('/') {
+                            format!("http://10.254.0.254:1000{}", u)
+                        } else {
+                            u.to_string()
+                        });
+                    }
+                }
+            }
+        }
+        for pat in ["location.href=", "location.href =", "window.location=", "window.location ="] {
+            if let Some(idx) = lower.find(pat) {
+                let rest = &html[idx + pat.len()..];
+                let trimmed = rest.trim_start();
+                if let Some(q) = trimmed.chars().next() {
+                    if q == '"' || q == '\'' {
+                        if let Some(end) = trimmed[1..].find(q) {
+                            let u = &trimmed[1..1 + end];
+                            return Some(if u.starts_with('/') {
+                                format!("http://10.254.0.254:1000{}", u)
+                            } else {
+                                u.to_string()
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub async fn login_to_portal_internal(username: &str, password: &str) -> Result<bool, String> {
         let client = Client::builder()
             .cookie_store(true)
-            .timeout(std::time::Duration::from_secs(10))
+            .timeout(std::time::Duration::from_secs(12))
             .redirect(reqwest::redirect::Policy::limited(5))
             .build()
             .map_err(|e| e.to_string())?;
 
-        let mut target_url = "http://10.254.0.254:1000/".to_string();
-        let probe = Client::builder()
-            .timeout(std::time::Duration::from_secs(3))
+        let probe_client = Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
             .redirect(reqwest::redirect::Policy::none())
             .build()
-            .ok();
+            .map_err(|e| e.to_string())?;
 
-        if let Some(p) = probe {
-            if let Ok(resp) = p.get("http://www.google.com/gen_204").send().await {
-                if let Some(loc) = resp.headers().get("location").and_then(|l| l.to_str().ok()) {
-                    if loc.contains("10.254.0.254") {
-                        target_url = loc.to_string();
+        // 1. Probing multiple endpoints starting with raw IP (1.1.1.1) to bypass DNS issues
+        let probe_endpoints = [
+            "http://1.1.1.1/",
+            "http://captive.apple.com/hotspot-detect.html",
+            "http://connectivitycheck.gstatic.com/generate_204",
+            "http://www.google.com/gen_204",
+            "http://detectportal.firefox.com/canonical.html",
+            "http://neverssl.com/",
+        ];
+
+        let mut target_url: Option<String> = None;
+        let mut magic_token: Option<String> = None;
+
+        for endpoint in &probe_endpoints {
+            if let Ok(resp) = probe_client.get(*endpoint).send().await {
+                let status_code = resp.status().as_u16();
+                if status_code == 204 {
+                    return Ok(true);
+                }
+
+                if let Some(loc_header) = resp.headers().get(reqwest::header::LOCATION) {
+                    if let Ok(loc) = loc_header.to_str() {
+                        let full_loc = if loc.starts_with('/') {
+                            format!("http://10.254.0.254:1000{}", loc)
+                        } else {
+                            loc.to_string()
+                        };
+                        target_url = Some(full_loc);
+                        break;
+                    }
+                }
+
+                if status_code == 200 {
+                    let text = resp.text().await.unwrap_or_default();
+                    if text.contains("Success") && *endpoint == "http://captive.apple.com/hotspot-detect.html" {
+                        return Ok(true);
+                    }
+                    if let Some(found_url) = extract_redirect_from_html(&text) {
+                        target_url = Some(found_url);
+                        break;
                     }
                 }
             }
         }
 
-        let resp = match client.get(&target_url).send().await {
-            Ok(r) => r,
-            Err(_) => client
-                .get("http://10.254.0.254/")
-                .send()
-                .await
-                .map_err(|e| format!("WifiCity connection failed: {}", e))?,
+        // 2. Direct probe to 10.254.0.254:1000 if no redirect received
+        if target_url.is_none() {
+            if let Ok(resp) = probe_client.get("http://10.254.0.254:1000/").send().await {
+                if let Some(loc) = resp.headers().get(reqwest::header::LOCATION).and_then(|l| l.to_str().ok()) {
+                    let full_loc = if loc.starts_with('/') {
+                        format!("http://10.254.0.254:1000{}", loc)
+                    } else {
+                        loc.to_string()
+                    };
+                    target_url = Some(full_loc);
+                } else {
+                    let text = resp.text().await.unwrap_or_default();
+                    if text.contains("fgtauth") || text.contains("magic") || text.contains("ft_un") {
+                        target_url = Some("http://10.254.0.254:1000/".to_string());
+                    }
+                }
+            }
+        }
+
+        let final_target_url = match target_url {
+            Some(u) => u,
+            None => {
+                if let Ok(s) = check_connectivity_internal().await {
+                    if s == "connected" {
+                        return Ok(true);
+                    }
+                }
+                return Err("WifiCity captive portal not detected. Please verify your device is connected to the 'WifiCity' Wi-Fi network.".to_string());
+            }
         };
+
+        if let Some(idx) = final_target_url.find("magic=") {
+            let val = &final_target_url[idx + 6..];
+            let tok = val.split('&').next().unwrap_or(val);
+            magic_token = Some(tok.to_string());
+        } else if let Some(idx) = final_target_url.find("fgtauth?") {
+            let val = &final_target_url[idx + 8..];
+            let tok = val.split('&').next().unwrap_or(val);
+            magic_token = Some(tok.to_string());
+        }
+
+        let resp = client
+            .get(&final_target_url)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to connect to captive portal: {}", e))?;
 
         let current_url = resp.url().to_string();
         let html_text = resp.text().await.map_err(|e| e.to_string())?;
         let (mut action, mut form_data) = parse_form(&html_text);
 
-        if !action.starts_with("http") {
-            action = format!("http://10.254.0.254:1000{}", action);
+        if magic_token.is_none() {
+            for url_str in [&current_url, &final_target_url] {
+                if let Some(idx) = url_str.find("magic=") {
+                    let val = &url_str[idx + 6..];
+                    magic_token = Some(val.split('&').next().unwrap_or(val).to_string());
+                    break;
+                } else if let Some(idx) = url_str.find("fgtauth?") {
+                    let val = &url_str[idx + 8..];
+                    magic_token = Some(val.split('&').next().unwrap_or(val).to_string());
+                    break;
+                }
+            }
         }
 
-        for url_str in [&current_url, &target_url] {
-            if let Some(idx) = url_str.find("magic=") {
-                let val = &url_str[idx + 6..];
-                let token = val.split('&').next().unwrap_or(val);
-                form_data.insert("magic".to_string(), token.to_string());
-                break;
-            } else if let Some(idx) = url_str.find("fgtauth?") {
-                let val = &url_str[idx + 8..];
-                let token = val.split('&').next().unwrap_or(val);
-                form_data.insert("magic".to_string(), token.to_string());
-                break;
-            }
+        if let Some(tok) = magic_token {
+            form_data.insert("magic".to_string(), tok);
         }
 
         form_data.insert("ft_un".to_string(), username.to_string());
         form_data.insert("ft_pd".to_string(), password.to_string());
         form_data.insert("username".to_string(), username.to_string());
         form_data.insert("password".to_string(), password.to_string());
+
+        if !action.starts_with("http") {
+            if action.starts_with('/') {
+                action = format!("http://10.254.0.254:1000{}", action);
+            } else {
+                action = format!("http://10.254.0.254:1000/{}", action);
+            }
+        }
 
         let login_resp = client
             .post(&action)
@@ -225,8 +348,9 @@ pub mod commands {
             || body.to_lowercase().contains("keep this window open");
 
         if !success {
-            if let Ok(verify) = client.get("http://www.google.com/gen_204").send().await {
-                if verify.status().as_u16() == 204 {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            if let Ok(status) = check_connectivity_internal().await {
+                if status == "connected" {
                     success = true;
                 }
             }
@@ -237,20 +361,34 @@ pub mod commands {
 
     pub async fn check_connectivity_internal() -> Result<String, String> {
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(3))
+            .timeout(std::time::Duration::from_secs(4))
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| e.to_string())?;
 
+        // 1. Apple captive portal check
+        if let Ok(resp) = client.get("http://captive.apple.com/hotspot-detect.html").send().await {
+            if resp.status().as_u16() == 200 {
+                let text = resp.text().await.unwrap_or_default();
+                if text.contains("Success") {
+                    return Ok("connected".to_string());
+                }
+            }
+        }
+
+        // 2. Google gen_204 check
         if let Ok(resp) = client.get("http://www.google.com/gen_204").send().await {
             if resp.status().as_u16() == 204 {
                 return Ok("connected".to_string());
             }
         }
 
-        if let Ok(resp) = client.get("http://captive.apple.com/hotspot-detect.html").send().await {
-            if resp.status().as_u16() == 200 && resp.text().await.unwrap_or_default().contains("Success") {
-                return Ok("connected".to_string());
+        // 3. Cloudflare 1.1.1.1 direct IP check
+        if let Ok(resp) = client.get("http://1.1.1.1/").send().await {
+            if let Some(loc) = resp.headers().get(reqwest::header::LOCATION).and_then(|l| l.to_str().ok()) {
+                if !loc.contains("10.254.0.254") && !loc.contains("fgtauth") {
+                    return Ok("connected".to_string());
+                }
             }
         }
 
@@ -305,7 +443,7 @@ pub mod commands {
 
             if _enable {
                 let _ = std::process::Command::new("schtasks")
-                    .args(&["/create", "/tn", "CiupWifiAuto", "/tr", &format!("\"{}\" --silent", _exe_path), "/sc", "minute", "/mo", "30", "/f"])
+                    .args(&["/create", "/tn", "CiupWifiAuto", "/tr", &format!("\"{}\" --silent", _exe_path), "/sc", "minute", "/mo", "5", "/f"])
                     .creation_flags(CREATE_NO_WINDOW)
                     .output();
                 let _ = std::process::Command::new("schtasks")
@@ -346,15 +484,28 @@ pub mod commands {
         <string>--silent</string>
     </array>
     <key>StartInterval</key>
-    <integer>1800</integer>
+    <integer>300</integer>
     <key>RunAtLoad</key>
     <true/>
+    <key>WatchPaths</key>
+    <array>
+        <string>/Library/Preferences/SystemConfiguration</string>
+    </array>
 </dict>
 </plist>"#,
                         _exe_path
                     );
                     let _ = std::fs::write(&plist_path, plist_content);
+                    let _ = std::process::Command::new("launchctl")
+                        .args(&["unload", plist_path.to_str().unwrap_or("")])
+                        .output();
+                    let _ = std::process::Command::new("launchctl")
+                        .args(&["load", "-w", plist_path.to_str().unwrap_or("")])
+                        .output();
                 } else {
+                    let _ = std::process::Command::new("launchctl")
+                        .args(&["unload", plist_path.to_str().unwrap_or("")])
+                        .output();
                     let _ = std::fs::remove_file(&plist_path);
                 }
             }
