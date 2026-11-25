@@ -3,7 +3,10 @@
 // @name:fr         Cité université wifi auto login script
 // @name:ko         Cité 기숙사 와이파이 자동 로그인 스크립트
 // @namespace       seojihyuk@university
+// @match           http://10.254.0.254/*
 // @match           http://10.254.0.254:*/*
+// @match           https://10.254.0.254/*
+// @match           https://10.254.0.254:*/*
 // @match           http://captive.apple.com/*
 // @match           http://detectportal.firefox.com/canonical.html
 // @match           http://www.msftconnecttest.com/redirect
@@ -46,6 +49,7 @@ const KEY = {
     SES_START: "sessionStartTime",
     SES_HIST: "sessionDurations",
     PROACTIVE: "proactiveRelogin",   // flag: true when WE initiated re-login (not expiry)
+    PORTAL_ORIGIN: "lastPortalOrigin",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -123,16 +127,17 @@ function scheduleRelogin() {
         ` Proactive re-login scheduled at ${reloginAt.toLocaleTimeString()}.`
     );
 
+    const portalTarget = GM_getValue(KEY.PORTAL_ORIGIN, "http://10.254.0.254") + "/";
     if (delay <= 0) {
         // Already past predicted expiry – re-login immediately
         GM_setValue(KEY.PROACTIVE, true);
-        window.location.href = "http://10.254.0.254/";
+        window.location.href = portalTarget;
         return null;
     }
 
     const timerId = setTimeout(() => {
         GM_setValue(KEY.PROACTIVE, true);
-        window.location.href = "http://10.254.0.254/";
+        window.location.href = portalTarget;
     }, delay);
 
     return { reloginAt, minMs, timerId };
@@ -188,6 +193,7 @@ function showStatusOverlay({ reloginAt, minMs }) {
 // ── Login Page Handler (hostname = 10.254.0.254) ──────────────────────────────
 
 function handleLoginPage() {
+    GM_setValue(KEY.PORTAL_ORIGIN, window.location.origin);
     // Arriving here means the previous session has ended → record its duration.
     recordSessionEnd();
 

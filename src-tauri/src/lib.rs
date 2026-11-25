@@ -1,10 +1,15 @@
-use tauri::Manager;
+pub mod daemon;
+pub mod portal;
+pub mod state;
+pub mod wifi;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            crate::commands::get_network_status,
             crate::commands::login_to_portal,
+            crate::commands::disconnect_wificity,
             crate::commands::check_connectivity,
             crate::commands::save_credentials,
             crate::commands::load_credentials,
@@ -16,393 +21,312 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
+pub fn run_daemon() {
+    daemon::run_daemon();
+}
+
 pub fn run_headless() {
     tauri::async_runtime::block_on(async {
-        let (username, password) = match read_credentials_direct() {
-            Some(creds) => creds,
+        let app_state = state::load_state(None);
+        if app_state.user_paused || !app_state.auto_enabled {
+            return;
+        }
+
+        let wifi_info = wifi::get_current_wifi_info();
+        let on_wificity = match wifi_info.ssid {
+            Some(ref s) => wifi::is_wificity_ssid(s),
+            None if wifi_info.is_wifi && wifi_info.location_blocked => wifi_info
+                .gateway_ip
+                .as_deref()
+                .map(wifi::is_ciup_gateway)
+                .unwrap_or(false),
+            None => false,
+        };
+
+        if !on_wificity {
+            return;
+        }
+
+        let creds = match state::load_credentials_direct(None) {
+            Some(c) => c,
             None => {
                 eprintln!("[CiupWifi] No saved credentials found. Please open CiupWifi once to save your login.");
                 return;
             }
         };
 
-        // Check if already connected
-        if let Ok(status) = commands::check_connectivity_internal().await {
-            if status == "connected" {
-                println!("[CiupWifi] Internet is already active.");
-                return;
-            }
+        let gw = wifi_info.gateway_ip.as_deref();
+        if matches!(portal::probe_connectivity(gw).await, portal::ProbeResult::Online) {
+            println!("[CiupWifi] WifiCity internet is already active.");
+            return;
         }
 
-        println!("[CiupWifi] Captive portal detected. Logging in as {}...", username);
-        match commands::login_to_portal_internal(&username, &password).await {
-            Ok(true) => println!("[CiupWifi] Login successful!"),
-            Ok(false) => eprintln!("[CiupWifi] Login rejected. Please verify credentials."),
-            Err(e) => eprintln!("[CiupWifi] Connection error: {}", e),
+        println!("[CiupWifi] Captive portal detected on WifiCity. Logging in as {}...", creds.username);
+        match portal::login_to_portal(&creds.username, &creds.password, gw).await {
+            portal::LoginOutcome::Success { portal_url, logout_url } => {
+                let mut st = state::load_state(None);
+                if portal_url.is_some() {
+                    st.last_portal_url = portal_url;
+                }
+                if logout_url.is_some() {
+                    st.last_logout_url = logout_url;
+                }
+                st.auth_failed = false;
+                st.last_error = None;
+                let _ = state::save_state(None, &st);
+                println!("[CiupWifi] Login successful!");
+            }
+            portal::LoginOutcome::AuthFailed(msg) => {
+                let mut st = state::load_state(None);
+                st.auth_failed = true;
+                st.last_error = Some(msg.clone());
+                let _ = state::save_state(None, &st);
+                eprintln!("[CiupWifi] {}", msg);
+            }
+            portal::LoginOutcome::Error(msg) => {
+                eprintln!("[CiupWifi] Connection error: {}", msg);
+            }
         }
     });
 }
 
-fn get_app_dir(app: Option<&tauri::AppHandle>) -> std::path::PathBuf {
-    if let Some(a) = app {
-        if let Ok(dir) = a.path().app_data_dir() {
-            return dir;
-        }
-    }
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(appdata) = std::env::var("APPDATA") {
-            return std::path::PathBuf::from(appdata).join("org.ciup.wifi");
-        }
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if let Ok(home) = std::env::var("HOME") {
-            return std::path::PathBuf::from(home).join("Library/Application Support/org.ciup.wifi");
-        }
-    }
-    #[cfg(target_os = "linux")]
-    {
-        if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
-            return std::path::PathBuf::from(xdg).join("org.ciup.wifi");
-        } else if let Ok(home) = std::env::var("HOME") {
-            return std::path::PathBuf::from(home).join(".config/org.ciup.wifi");
-        }
-    }
-    std::path::PathBuf::from("org.ciup.wifi")
-}
-
-pub fn read_credentials_direct() -> Option<(String, String)> {
-    let dir = get_app_dir(None);
-    let path = dir.join("credentials.json");
-    let content = std::fs::read_to_string(path).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let u = v.get("username")?.as_str()?.to_string();
-    let p = v.get("password")?.as_str()?.to_string();
-    if u.is_empty() || p.is_empty() {
-        None
-    } else {
-        Some((u, p))
-    }
-}
-
 pub mod commands {
+    use crate::{daemon, portal, state, wifi};
     use reqwest::Client;
-    use std::collections::HashMap;
 
-    fn parse_form(html_text: &str) -> (String, HashMap<String, String>) {
-        let mut form_data: HashMap<String, String> = HashMap::new();
-        let mut action = "http://10.254.0.254:1000/".to_string();
-
-        if let Some(form_idx) = html_text.to_lowercase().find("<form") {
-            let rest = &html_text[form_idx..];
-            if let Some(action_idx) = rest.to_lowercase().find("action=") {
-                let after = &rest[action_idx + 7..];
-                let quote = after.chars().next().unwrap_or('"');
-                let (offset, end) = if quote == '"' || quote == '\'' {
-                    (1, after[1..].find(quote).unwrap_or(after.len() - 1))
-                } else {
-                    (0, after.find(|c: char| c.is_whitespace() || c == '>').unwrap_or(after.len()))
-                };
-                let act = &after[offset..offset + end];
-                if !act.is_empty() {
-                    action = if act.starts_with("http") {
-                        act.to_string()
-                    } else if act.starts_with('/') {
-                        format!("http://10.254.0.254:1000{}", act)
-                    } else {
-                        format!("http://10.254.0.254:1000/{}", act)
-                    };
-                }
-            }
+    fn evaluate_wificity(wifi_info: &wifi::WifiInfo) -> (bool, bool) {
+        if let Some(ref ssid) = wifi_info.ssid {
+            (wifi::is_wificity_ssid(ssid), false)
+        } else if wifi_info.is_wifi && wifi_info.location_blocked {
+            let ciup_gw = wifi_info
+                .gateway_ip
+                .as_deref()
+                .map(wifi::is_ciup_gateway)
+                .unwrap_or(false);
+            (ciup_gw, !ciup_gw)
+        } else {
+            (false, false)
         }
-
-        let lower = html_text.to_lowercase();
-        let mut pos = 0;
-        while let Some(tag_start) = lower[pos..].find("<input") {
-            let abs_start = pos + tag_start;
-            let tag_end = match lower[abs_start..].find('>') {
-                Some(e) => abs_start + e,
-                None => break,
-            };
-            let tag = &html_text[abs_start..tag_end];
-            let tag_lower = &lower[abs_start..tag_end];
-
-            let get_attr = |attr_name: &str| -> Option<String> {
-                let pat = format!("{}=", attr_name);
-                let idx = tag_lower.find(&pat)?;
-                let val_str = &tag[idx + pat.len()..];
-                let q = val_str.chars().next()?;
-                let (off, len) = if q == '"' || q == '\'' {
-                    (1, val_str[1..].find(q)?)
-                } else {
-                    (0, val_str.find(|c: char| c.is_whitespace() || c == '>').unwrap_or(val_str.len()))
-                };
-                Some(val_str[off..off + len].to_string())
-            };
-
-            if let (Some(name), Some(val)) = (get_attr("name"), get_attr("value")) {
-                if !name.is_empty() {
-                    form_data.insert(name, val);
-                }
-            }
-            pos = tag_end + 1;
-        }
-
-        (action, form_data)
-    }
-
-    fn extract_redirect_from_html(html: &str) -> Option<String> {
-        let lower = html.to_lowercase();
-        if let Some(idx) = lower.find("http-equiv=\"refresh\"") {
-            if let Some(c_idx) = lower[idx..].find("content=") {
-                let rest = &html[idx + c_idx + 8..];
-                if let Some(u_idx) = rest.to_lowercase().find("url=") {
-                    let url_part = &rest[u_idx + 4..];
-                    let clean = url_part.trim_matches(|c: char| c == '"' || c == '\'' || c == ' ');
-                    let end = clean.find(|c: char| c == '"' || c == '\'' || c == ' ' || c == '>').unwrap_or(clean.len());
-                    let u = &clean[..end];
-                    if !u.is_empty() {
-                        return Some(if u.starts_with('/') {
-                            format!("http://10.254.0.254:1000{}", u)
-                        } else {
-                            u.to_string()
-                        });
-                    }
-                }
-            }
-        }
-        for pat in ["location.href=", "location.href =", "window.location=", "window.location ="] {
-            if let Some(idx) = lower.find(pat) {
-                let rest = &html[idx + pat.len()..];
-                let trimmed = rest.trim_start();
-                if let Some(q) = trimmed.chars().next() {
-                    if q == '"' || q == '\'' {
-                        if let Some(end) = trimmed[1..].find(q) {
-                            let u = &trimmed[1..1 + end];
-                            return Some(if u.starts_with('/') {
-                                format!("http://10.254.0.254:1000{}", u)
-                            } else {
-                                u.to_string()
-                            });
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    pub async fn login_to_portal_internal(username: &str, password: &str) -> Result<bool, String> {
-        let client = Client::builder()
-            .cookie_store(true)
-            .timeout(std::time::Duration::from_secs(12))
-            .redirect(reqwest::redirect::Policy::limited(5))
-            .build()
-            .map_err(|e| e.to_string())?;
-
-        let probe_client = Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|e| e.to_string())?;
-
-        // 1. Probing multiple endpoints starting with raw IP (1.1.1.1) to bypass DNS issues
-        let probe_endpoints = [
-            "http://1.1.1.1/",
-            "http://captive.apple.com/hotspot-detect.html",
-            "http://connectivitycheck.gstatic.com/generate_204",
-            "http://www.google.com/gen_204",
-            "http://detectportal.firefox.com/canonical.html",
-            "http://neverssl.com/",
-        ];
-
-        let mut target_url: Option<String> = None;
-        let mut magic_token: Option<String> = None;
-
-        for endpoint in &probe_endpoints {
-            if let Ok(resp) = probe_client.get(*endpoint).send().await {
-                let status_code = resp.status().as_u16();
-                if status_code == 204 {
-                    return Ok(true);
-                }
-
-                if let Some(loc_header) = resp.headers().get(reqwest::header::LOCATION) {
-                    if let Ok(loc) = loc_header.to_str() {
-                        let full_loc = if loc.starts_with('/') {
-                            format!("http://10.254.0.254:1000{}", loc)
-                        } else {
-                            loc.to_string()
-                        };
-                        target_url = Some(full_loc);
-                        break;
-                    }
-                }
-
-                if status_code == 200 {
-                    let text = resp.text().await.unwrap_or_default();
-                    if text.contains("Success") && *endpoint == "http://captive.apple.com/hotspot-detect.html" {
-                        return Ok(true);
-                    }
-                    if let Some(found_url) = extract_redirect_from_html(&text) {
-                        target_url = Some(found_url);
-                        break;
-                    }
-                }
-            }
-        }
-
-        // 2. Direct probe to 10.254.0.254:1000 if no redirect received
-        if target_url.is_none() {
-            if let Ok(resp) = probe_client.get("http://10.254.0.254:1000/").send().await {
-                if let Some(loc) = resp.headers().get(reqwest::header::LOCATION).and_then(|l| l.to_str().ok()) {
-                    let full_loc = if loc.starts_with('/') {
-                        format!("http://10.254.0.254:1000{}", loc)
-                    } else {
-                        loc.to_string()
-                    };
-                    target_url = Some(full_loc);
-                } else {
-                    let text = resp.text().await.unwrap_or_default();
-                    if text.contains("fgtauth") || text.contains("magic") || text.contains("ft_un") {
-                        target_url = Some("http://10.254.0.254:1000/".to_string());
-                    }
-                }
-            }
-        }
-
-        let final_target_url = match target_url {
-            Some(u) => u,
-            None => {
-                if let Ok(s) = check_connectivity_internal().await {
-                    if s == "connected" {
-                        return Ok(true);
-                    }
-                }
-                return Err("WifiCity captive portal not detected. Please verify your device is connected to the 'WifiCity' Wi-Fi network.".to_string());
-            }
-        };
-
-        if let Some(idx) = final_target_url.find("magic=") {
-            let val = &final_target_url[idx + 6..];
-            let tok = val.split('&').next().unwrap_or(val);
-            magic_token = Some(tok.to_string());
-        } else if let Some(idx) = final_target_url.find("fgtauth?") {
-            let val = &final_target_url[idx + 8..];
-            let tok = val.split('&').next().unwrap_or(val);
-            magic_token = Some(tok.to_string());
-        }
-
-        let resp = client
-            .get(&final_target_url)
-            .send()
-            .await
-            .map_err(|e| format!("Failed to connect to captive portal: {}", e))?;
-
-        let current_url = resp.url().to_string();
-        let html_text = resp.text().await.map_err(|e| e.to_string())?;
-        let (mut action, mut form_data) = parse_form(&html_text);
-
-        if magic_token.is_none() {
-            for url_str in [&current_url, &final_target_url] {
-                if let Some(idx) = url_str.find("magic=") {
-                    let val = &url_str[idx + 6..];
-                    magic_token = Some(val.split('&').next().unwrap_or(val).to_string());
-                    break;
-                } else if let Some(idx) = url_str.find("fgtauth?") {
-                    let val = &url_str[idx + 8..];
-                    magic_token = Some(val.split('&').next().unwrap_or(val).to_string());
-                    break;
-                }
-            }
-        }
-
-        if let Some(tok) = magic_token {
-            form_data.insert("magic".to_string(), tok);
-        }
-
-        form_data.insert("ft_un".to_string(), username.to_string());
-        form_data.insert("ft_pd".to_string(), password.to_string());
-        form_data.insert("username".to_string(), username.to_string());
-        form_data.insert("password".to_string(), password.to_string());
-
-        if !action.starts_with("http") {
-            if action.starts_with('/') {
-                action = format!("http://10.254.0.254:1000{}", action);
-            } else {
-                action = format!("http://10.254.0.254:1000/{}", action);
-            }
-        }
-
-        let login_resp = client
-            .post(&action)
-            .form(&form_data)
-            .send()
-            .await
-            .map_err(|e| format!("Login request failed: {}", e))?;
-
-        let body = login_resp.text().await.unwrap_or_default();
-        let mut success = body.contains("Success")
-            || body.to_lowercase().contains("welcome")
-            || body.to_lowercase().contains("connected")
-            || body.to_lowercase().contains("keep this window open");
-
-        if !success {
-            std::thread::sleep(std::time::Duration::from_millis(500));
-            if let Ok(status) = check_connectivity_internal().await {
-                if status == "connected" {
-                    success = true;
-                }
-            }
-        }
-
-        Ok(success)
-    }
-
-    pub async fn check_connectivity_internal() -> Result<String, String> {
-        let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(4))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|e| e.to_string())?;
-
-        // 1. Apple captive portal check
-        if let Ok(resp) = client.get("http://captive.apple.com/hotspot-detect.html").send().await {
-            if resp.status().as_u16() == 200 {
-                let text = resp.text().await.unwrap_or_default();
-                if text.contains("Success") {
-                    return Ok("connected".to_string());
-                }
-            }
-        }
-
-        // 2. Google gen_204 check
-        if let Ok(resp) = client.get("http://www.google.com/gen_204").send().await {
-            if resp.status().as_u16() == 204 {
-                return Ok("connected".to_string());
-            }
-        }
-
-        // 3. Cloudflare 1.1.1.1 direct IP check
-        if let Ok(resp) = client.get("http://1.1.1.1/").send().await {
-            if let Some(loc) = resp.headers().get(reqwest::header::LOCATION).and_then(|l| l.to_str().ok()) {
-                if !loc.contains("10.254.0.254") && !loc.contains("fgtauth") {
-                    return Ok("connected".to_string());
-                }
-            }
-        }
-
-        Ok("captive".to_string())
     }
 
     #[tauri::command]
-    pub async fn login_to_portal(username: String, password: String) -> Result<bool, String> {
-        login_to_portal_internal(&username, &password).await
+    pub async fn get_network_status(app: tauri::AppHandle) -> Result<state::NetworkStatus, String> {
+        let app_state = state::load_state(Some(&app));
+        let wifi_info = wifi::get_current_wifi_info();
+        let (is_wificity, needs_location_perm) = evaluate_wificity(&wifi_info);
+
+        if needs_location_perm {
+            return Ok(state::NetworkStatus {
+                state: "permission_needed".to_string(),
+                ssid: None,
+                is_wifi: true,
+                is_cellular: false,
+                is_wificity: false,
+                user_paused: app_state.user_paused,
+                auto_enabled: app_state.auto_enabled,
+                auth_failed: app_state.auth_failed,
+                portal_url: app_state.last_portal_url,
+                detail: Some(
+                    "Enable Location access in OS settings so CiupWifi can verify the Wi-Fi network name (WifiCity)."
+                        .to_string(),
+                ),
+            });
+        }
+
+        if !wifi_info.is_wifi {
+            return Ok(state::NetworkStatus {
+                state: "disconnected".to_string(),
+                ssid: None,
+                is_wifi: false,
+                is_cellular: false,
+                is_wificity: false,
+                user_paused: app_state.user_paused,
+                auto_enabled: app_state.auto_enabled,
+                auth_failed: app_state.auth_failed,
+                portal_url: None,
+                detail: Some("Wi-Fi is not connected.".to_string()),
+            });
+        }
+
+        if !is_wificity {
+            return Ok(state::NetworkStatus {
+                state: "not_on_wificity".to_string(),
+                ssid: wifi_info.ssid,
+                is_wifi: true,
+                is_cellular: false,
+                is_wificity: false,
+                user_paused: app_state.user_paused,
+                auto_enabled: app_state.auto_enabled,
+                auth_failed: app_state.auth_failed,
+                portal_url: None,
+                detail: Some("Not connected to WifiCity.".to_string()),
+            });
+        }
+
+        if app_state.user_paused {
+            return Ok(state::NetworkStatus {
+                state: "paused".to_string(),
+                ssid: wifi_info.ssid.or_else(|| Some("WifiCity".to_string())),
+                is_wifi: true,
+                is_cellular: false,
+                is_wificity: true,
+                user_paused: true,
+                auto_enabled: app_state.auto_enabled,
+                auth_failed: app_state.auth_failed,
+                portal_url: app_state.last_portal_url,
+                detail: Some("Disconnected by user. Tap Connect or rejoin WifiCity to resume.".to_string()),
+            });
+        }
+
+        let gw = wifi_info.gateway_ip.as_deref();
+        match portal::probe_connectivity(gw).await {
+            portal::ProbeResult::Online => Ok(state::NetworkStatus {
+                state: "wifi_city_online".to_string(),
+                ssid: wifi_info.ssid.or_else(|| Some("WifiCity".to_string())),
+                is_wifi: true,
+                is_cellular: false,
+                is_wificity: true,
+                user_paused: false,
+                auto_enabled: app_state.auto_enabled,
+                auth_failed: false,
+                portal_url: app_state.last_portal_url,
+                detail: None,
+            }),
+            portal::ProbeResult::Captive { portal_url, .. } => Ok(state::NetworkStatus {
+                state: "wifi_city_captive".to_string(),
+                ssid: wifi_info.ssid.or_else(|| Some("WifiCity".to_string())),
+                is_wifi: true,
+                is_cellular: false,
+                is_wificity: true,
+                user_paused: false,
+                auto_enabled: app_state.auto_enabled,
+                auth_failed: app_state.auth_failed,
+                portal_url: Some(portal_url),
+                detail: app_state.last_error,
+            }),
+            portal::ProbeResult::Offline => Ok(state::NetworkStatus {
+                state: "wifi_city_captive".to_string(),
+                ssid: wifi_info.ssid.or_else(|| Some("WifiCity".to_string())),
+                is_wifi: true,
+                is_cellular: false,
+                is_wificity: true,
+                user_paused: false,
+                auto_enabled: app_state.auto_enabled,
+                auth_failed: app_state.auth_failed,
+                portal_url: app_state.last_portal_url,
+                detail: Some("Connected to WifiCity, waiting for internet or portal...".to_string()),
+            }),
+        }
     }
 
     #[tauri::command]
-    pub async fn check_connectivity() -> Result<String, String> {
-        check_connectivity_internal().await
+    pub async fn login_to_portal(
+        app: tauri::AppHandle,
+        username: String,
+        password: String,
+    ) -> Result<serde_json::Value, String> {
+        let wifi_info = wifi::get_current_wifi_info();
+        let (is_wificity, needs_location_perm) = evaluate_wificity(&wifi_info);
+
+        if needs_location_perm {
+            return Ok(serde_json::json!({
+                "ok": false,
+                "reason": "permission_needed",
+                "auth_failed": false,
+                "message": "Enable Location access in OS settings so CiupWifi can verify WifiCity."
+            }));
+        }
+
+        if !wifi_info.is_wifi || !is_wificity {
+            let msg = match wifi_info.ssid {
+                Some(ref s) => format!("Currently connected to '{}' (not WifiCity). Switch to WifiCity first.", s),
+                None => "Not connected to the WifiCity Wi-Fi network.".to_string(),
+            };
+            return Ok(serde_json::json!({
+                "ok": false,
+                "reason": "not_on_wificity",
+                "auth_failed": false,
+                "message": msg
+            }));
+        }
+
+        let mut app_state = state::load_state(Some(&app));
+        app_state.user_paused = false;
+        app_state.auth_failed = false;
+        app_state.last_error = None;
+        let _ = state::save_state(Some(&app), &app_state);
+
+        let gw = wifi_info.gateway_ip.as_deref();
+        match portal::login_to_portal(&username, &password, gw).await {
+            portal::LoginOutcome::Success {
+                portal_url,
+                logout_url,
+            } => {
+                if let Some(ref p) = portal_url {
+                    app_state.last_portal_url = Some(p.clone());
+                }
+                if let Some(ref l) = logout_url {
+                    app_state.last_logout_url = Some(l.clone());
+                }
+                app_state.auth_failed = false;
+                app_state.last_error = None;
+                let _ = state::save_state(Some(&app), &app_state);
+
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "auth_failed": false,
+                    "portal_url": portal_url,
+                    "message": "Connected to WifiCity."
+                }))
+            }
+            portal::LoginOutcome::AuthFailed(msg) => {
+                app_state.auth_failed = true;
+                app_state.last_error = Some(msg.clone());
+                let _ = state::save_state(Some(&app), &app_state);
+
+                Ok(serde_json::json!({
+                    "ok": false,
+                    "reason": "auth_failed",
+                    "auth_failed": true,
+                    "message": msg
+                }))
+            }
+            portal::LoginOutcome::Error(msg) => {
+                app_state.last_error = Some(msg.clone());
+                let _ = state::save_state(Some(&app), &app_state);
+
+                Ok(serde_json::json!({
+                    "ok": false,
+                    "reason": "error",
+                    "auth_failed": false,
+                    "message": msg
+                }))
+            }
+        }
+    }
+
+    #[tauri::command]
+    pub async fn disconnect_wificity(app: tauri::AppHandle) -> Result<(), String> {
+        let mut app_state = state::load_state(Some(&app));
+        app_state.user_paused = true;
+        let logout_url = app_state.last_logout_url.clone();
+        state::save_state(Some(&app), &app_state)?;
+
+        if let Some(url) = logout_url {
+            portal::logout_from_portal(&url).await;
+        }
+        wifi::disconnect_wifi()?;
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub async fn check_connectivity(app: tauri::AppHandle) -> Result<String, String> {
+        let status = get_network_status(app).await?;
+        if status.state == "wifi_city_online" {
+            Ok("connected".to_string())
+        } else {
+            Ok(status.state)
+        }
     }
 
     #[tauri::command]
@@ -411,107 +335,31 @@ pub mod commands {
         username: String,
         password: String,
     ) -> Result<(), String> {
-        use std::io::Write;
-        let data_dir = super::get_app_dir(Some(&app));
-        std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
-        let cred = serde_json::json!({ "username": username, "password": password });
-        let mut f = std::fs::File::create(data_dir.join("credentials.json")).map_err(|e| e.to_string())?;
-        f.write_all(cred.to_string().as_bytes()).map_err(|e| e.to_string())?;
+        state::save_credentials_direct(Some(&app), &username, &password)?;
+        let mut app_state = state::load_state(Some(&app));
+        app_state.auth_failed = false;
+        app_state.last_error = None;
+        let _ = state::save_state(Some(&app), &app_state);
         Ok(())
     }
 
     #[tauri::command]
     pub fn load_credentials(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-        let data_dir = super::get_app_dir(Some(&app));
-        let path = data_dir.join("credentials.json");
-        if !path.exists() {
-            return Ok(serde_json::json!({ "username": "", "password": "" }));
+        match state::load_credentials_direct(Some(&app)) {
+            Some(c) => Ok(serde_json::json!({
+                "username": c.username,
+                "password": c.password,
+            })),
+            None => Ok(serde_json::json!({
+                "username": "",
+                "password": "",
+            })),
         }
-        let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&content).map_err(|e| e.to_string())
     }
 
     #[tauri::command]
-    pub fn setup_background_task(_enable: bool) -> Result<(), String> {
-        let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let _exe_path = current_exe.to_string_lossy().to_string();
-
-        #[cfg(target_os = "windows")]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-            if _enable {
-                let _ = std::process::Command::new("schtasks")
-                    .args(&["/create", "/tn", "CiupWifiAuto", "/tr", &format!("\"{}\" --silent", _exe_path), "/sc", "minute", "/mo", "5", "/f"])
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .output();
-                let _ = std::process::Command::new("schtasks")
-                    .args(&["/create", "/tn", "CiupWifiLogon", "/tr", &format!("\"{}\" --silent", _exe_path), "/sc", "onlogon", "/f"])
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .output();
-            } else {
-                let _ = std::process::Command::new("schtasks")
-                    .args(&["/delete", "/tn", "CiupWifiAuto", "/f"])
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .output();
-                let _ = std::process::Command::new("schtasks")
-                    .args(&["/delete", "/tn", "CiupWifiLogon", "/f"])
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .output();
-            }
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            if let Ok(home) = std::env::var("HOME") {
-                let plist_path = std::path::PathBuf::from(home)
-                    .join("Library/LaunchAgents/org.ciup.wifi.plist");
-                if _enable {
-                    if let Some(parent) = plist_path.parent() {
-                        let _ = std::fs::create_dir_all(parent);
-                    }
-                    let plist_content = format!(
-                        r#"<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>org.ciup.wifi</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>{}</string>
-        <string>--silent</string>
-    </array>
-    <key>StartInterval</key>
-    <integer>300</integer>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>WatchPaths</key>
-    <array>
-        <string>/Library/Preferences/SystemConfiguration</string>
-    </array>
-</dict>
-</plist>"#,
-                        _exe_path
-                    );
-                    let _ = std::fs::write(&plist_path, plist_content);
-                    let _ = std::process::Command::new("launchctl")
-                        .args(&["unload", plist_path.to_str().unwrap_or("")])
-                        .output();
-                    let _ = std::process::Command::new("launchctl")
-                        .args(&["load", "-w", plist_path.to_str().unwrap_or("")])
-                        .output();
-                } else {
-                    let _ = std::process::Command::new("launchctl")
-                        .args(&["unload", plist_path.to_str().unwrap_or("")])
-                        .output();
-                    let _ = std::fs::remove_file(&plist_path);
-                }
-            }
-        }
-
-        Ok(())
+    pub fn setup_background_task(enable: bool) -> Result<(), String> {
+        daemon::setup_background_task_internal(enable)
     }
 
     #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -535,8 +383,12 @@ pub mod commands {
         let l_parts = parse_version_parts(latest);
         let c_parts = parse_version_parts(current);
         for (l, c) in l_parts.iter().zip(c_parts.iter()) {
-            if l > c { return true; }
-            if l < c { return false; }
+            if l > c {
+                return true;
+            }
+            if l < c {
+                return false;
+            }
         }
         l_parts.len() > c_parts.len()
     }
@@ -576,7 +428,11 @@ pub mod commands {
             return Ok(None);
         }
 
-        let body = json.get("body").and_then(|b| b.as_str()).unwrap_or("").to_string();
+        let body = json
+            .get("body")
+            .and_then(|b| b.as_str())
+            .unwrap_or("")
+            .to_string();
         let assets = json.get("assets").and_then(|a| a.as_array());
 
         let mut download_url = String::new();
@@ -585,7 +441,10 @@ pub mod commands {
         if let Some(assets) = assets {
             for asset in assets {
                 let name = asset.get("name").and_then(|n| n.as_str()).unwrap_or("");
-                let url = asset.get("browser_download_url").and_then(|u| u.as_str()).unwrap_or("");
+                let url = asset
+                    .get("browser_download_url")
+                    .and_then(|u| u.as_str())
+                    .unwrap_or("");
 
                 #[cfg(target_os = "windows")]
                 if name.ends_with(".exe") {
@@ -608,8 +467,15 @@ pub mod commands {
                     break;
                 }
 
-                #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "android")))]
-                if name.ends_with(".tar.gz") || name.ends_with(".deb") || name.ends_with(".AppImage") {
+                #[cfg(not(any(
+                    target_os = "windows",
+                    target_os = "macos",
+                    target_os = "android"
+                )))]
+                if name.ends_with(".tar.gz")
+                    || name.ends_with(".deb")
+                    || name.ends_with(".AppImage")
+                {
                     download_url = url.to_string();
                     asset_name = name.to_string();
                     break;
@@ -631,7 +497,10 @@ pub mod commands {
     }
 
     #[tauri::command]
-    pub async fn download_and_install_update(download_url: String, asset_name: String) -> Result<String, String> {
+    pub async fn download_and_install_update(
+        download_url: String,
+        asset_name: String,
+    ) -> Result<String, String> {
         let client = Client::builder()
             .user_agent("CiupWifi-App")
             .timeout(std::time::Duration::from_secs(120))

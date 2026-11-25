@@ -99,6 +99,9 @@ jobs:
       - name: Init Tauri Android project
         run: npx tauri android init --ci
 
+      - name: Apply Android Native Wi-Fi Overlay
+        run: python3 scripts/apply_android_overlay.py
+
       - name: Apply Custom App Icons to Android
         run: cp -rf src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
 

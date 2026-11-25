@@ -19,40 +19,61 @@
       <button class="btn-update" id="btn-update">Update</button>
     </div>
 
-    <!-- ── Status Card (Connected) ── -->
+    <!-- ── Android Permissions Banner ── -->
+    <div id="perm-banner" class="perm-banner" style="display:none">
+      <div class="perm-text" id="perm-text">Location permission is needed to detect WifiCity.</div>
+      <div class="perm-actions">
+        <button class="btn-perm" id="btn-grant-perm">Grant</button>
+        <button class="btn-perm btn-perm-secondary" id="btn-battery-perm" style="display:none">Battery</button>
+      </div>
+    </div>
+
+    <!-- ── Status Card ── -->
     <div class="card" id="card-status" style="display:none">
-      <div class="status-indicator">
-        <div class="pulse-ring"></div>
-        <div class="status-dot"></div>
+      <div class="status-indicator" id="status-indicator">
+        <div class="pulse-ring" id="pulse-ring"></div>
+        <div class="status-dot" id="status-dot"></div>
       </div>
 
-      <h1 class="brand-title">Connected</h1>
-      <p class="brand-sub">Cité Universitaire • WifiCity</p>
+      <h1 class="brand-title" id="status-title">Connected</h1>
+      <p class="brand-sub" id="status-sub">Cité Universitaire • WifiCity</p>
 
       <div class="info-group">
         <div class="info-row">
           <span class="label">Network</span>
-          <span class="value online" id="status-time">Online</span>
+          <span class="value" id="status-network">—</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Wi-Fi</span>
+          <span class="value" id="status-ssid">—</span>
         </div>
         <div class="info-row">
           <span class="label">Account</span>
           <span class="value" id="current-user">—</span>
         </div>
+        <div class="info-row" id="row-portal" style="display:none">
+          <span class="label">Portal</span>
+          <span class="value" id="status-portal">—</span>
+        </div>
         <div class="info-row">
-          <span class="label">Auto-Renewal</span>
-          <span class="value text-emerald">⚡ Active (OS Task)</span>
+          <span class="label">Auto-Connect</span>
+          <span class="value text-emerald" id="status-auto">⚡ Active</span>
         </div>
       </div>
 
-      <p class="hint-dismiss">You can safely close this window.<br/>Background renewal runs silently.</p>
+      <div id="card-status-msg" class="status-msg" style="display:none; margin-bottom:14px;"></div>
+
+      <p class="hint-dismiss" id="status-hint">Background monitor runs silently whenever you join WifiCity.</p>
 
       <div class="action-stack">
-        <button class="btn-primary" id="btn-recheck">Check Connection</button>
+        <button class="btn-primary" id="btn-primary-action">Check Connection</button>
+        <button class="btn-danger-ghost" id="btn-disconnect" style="display:none">Disconnect WifiCity</button>
+        <button class="btn-ghost" id="btn-wifi-settings" style="display:none">Open Wi-Fi Settings</button>
         <button class="btn-ghost" id="btn-logout">Change Account</button>
       </div>
     </div>
 
-    <!-- ── Login Card ── -->
+    <!-- ── Login / Credentials Card ── -->
     <div class="card" id="card-login">
       <div class="logo-badge">
         <svg class="wifi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -64,7 +85,7 @@
       </div>
 
       <h1 class="brand-title">CiupWifi</h1>
-      <p class="brand-sub">Auto-login for CIUP Campus Network</p>
+      <p class="brand-sub" id="login-sub">Auto-login for CIUP Campus Network</p>
 
       <div class="form-container">
         <div class="field">
@@ -91,10 +112,11 @@
 
         <div id="status-msg" class="status-msg" style="display:none"></div>
 
-        <button class="btn-primary" id="btn-login">Connect</button>
+        <button class="btn-primary" id="btn-login">Save &amp; Connect</button>
+        <button class="btn-ghost" id="btn-cancel-edit" style="display:none">Back to Status</button>
       </div>
 
-      <p class="footer-meta">WifiCity Gateway (10.254.0.254)</p>
+      <p class="footer-meta">WifiCity Auto-Portal (All Ports)</p>
     </div>
   </div>
 

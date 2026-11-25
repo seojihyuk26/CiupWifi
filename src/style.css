@@ -14,7 +14,8 @@ body {
   background-color: #090d16;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: #f1f5f9;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   user-select: none;
 }
 
@@ -83,6 +84,44 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+/* ── Permission Banner ── */
+.perm-banner {
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.perm-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-perm {
+  background: #f59e0b;
+  color: #0f172a;
+  border: none;
+  border-radius: 9999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-perm-secondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fde68a;
 }
 
 /* ── Glass Card ── */
@@ -221,6 +260,17 @@ body {
   z-index: 2;
 }
 
+.status-dot.connecting,
+.status-dot.paused {
+  background: #f59e0b;
+  box-shadow: 0 0 16px #f59e0b;
+}
+
+.status-dot.idle {
+  background: #64748b;
+  box-shadow: 0 0 12px rgba(100, 116, 139, 0.5);
+}
+
 .pulse-ring {
   position: absolute;
   width: 100%;
@@ -229,6 +279,10 @@ body {
   border: 2px solid rgba(16, 185, 129, 0.5);
   animation: pulseAnim 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
   z-index: 1;
+}
+
+.pulse-ring.amber {
+  border-color: rgba(245, 158, 11, 0.5);
 }
 
 @keyframes pulseAnim {
@@ -274,8 +328,23 @@ body {
   font-weight: 600;
 }
 
+.info-row .value.warn {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.info-row .value.muted {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
 .text-emerald {
   color: #10b981;
+  font-weight: 500;
+}
+
+.text-amber {
+  color: #fbbf24;
   font-weight: 500;
 }
 
@@ -333,6 +402,29 @@ body {
   background: rgba(255, 255, 255, 0.04);
   color: #f1f5f9;
   border-color: rgba(255, 255, 255, 0.15);
+}
+
+.btn-danger-ghost {
+  width: 100%;
+  padding: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-danger-ghost:hover {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fecaca;
+}
+
+.btn-danger-ghost:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .action-stack {
