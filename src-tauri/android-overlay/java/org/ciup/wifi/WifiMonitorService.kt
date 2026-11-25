@@ -341,7 +341,7 @@ class WifiMonitorService : Service() {
             .build()
 
         val cb = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            object : ConnectivityManager.NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) {
+            object : ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
                 override fun onAvailable(network: Network) = handleWifiAvailable(network)
                 override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) =
                     handleWifiCapabilitiesChanged(network, caps)
