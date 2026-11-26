@@ -1,8 +1,11 @@
+use crate::state::AppState;
+
 #[derive(Clone, Debug, Default)]
 pub struct WifiInfo {
     pub is_wifi: bool,
     pub ssid: Option<String>,
     pub gateway_ip: Option<String>,
+    pub domain_name: Option<String>,
     pub location_blocked: bool,
 }
 
@@ -15,6 +18,36 @@ pub fn is_wificity_ssid(ssid: &str) -> bool {
 /// Returns true if the gateway IP belongs to the CIUP 10.254.x.x subnet.
 pub fn is_ciup_gateway(ip: &str) -> bool {
     ip.trim().starts_with("10.254.")
+}
+
+/// Returns true if the DHCP domain name belongs to CIUP / WifiCity.
+pub fn is_ciup_domain(domain: &str) -> bool {
+    let lower = domain.trim().to_lowercase();
+    lower.contains("ciup") || lower.contains("wificity")
+}
+
+/// Evaluates whether the device is on WifiCity without performing network probes.
+/// Returns `Some(true)` if definitively WifiCity, `Some(false)` if definitively not,
+/// or `None` when Wi-Fi is active but the OS redacted the SSID and the gateway is not yet known.
+pub fn is_known_wificity_without_probe(wifi_info: &WifiInfo, state: &AppState) -> Option<bool> {
+    if let Some(ref ssid) = wifi_info.ssid {
+        return Some(is_wificity_ssid(ssid));
+    }
+    if !wifi_info.is_wifi {
+        return Some(false);
+    }
+    if let Some(ref gw) = wifi_info.gateway_ip {
+        let clean = gw.trim();
+        if is_ciup_gateway(clean) || state.known_ciup_gateways.iter().any(|k| k == clean) {
+            return Some(true);
+        }
+    }
+    if let Some(ref dom) = wifi_info.domain_name {
+        if is_ciup_domain(dom) {
+            return Some(true);
+        }
+    }
+    None
 }
 
 /// Query current Wi-Fi status, SSID, and default gateway on the host OS.
@@ -286,7 +319,7 @@ fn disconnect_windows_wificity() -> Result<(), String> {
 
 #[cfg(target_os = "macos")]
 fn get_macos_wifi_device() -> String {
-    if let Ok(output) = std::process::Command::new("networksetup")
+    if let Ok(output) = std::process::Command::new("/usr/sbin/networksetup")
         .args(["-listallhardwareports"])
         .output()
     {
@@ -316,49 +349,45 @@ fn get_macos_wifi_info() -> WifiInfo {
     let dev = get_macos_wifi_device();
     let mut info = WifiInfo::default();
 
-    if let Ok(output) = std::process::Command::new("networksetup")
-        .args(["-getairportnetwork", &dev])
+    // 1. Check link status & non-link-local IPv4 via /sbin/ifconfig (immune to Sequoia/Tahoe SSID redaction)
+    if let Ok(output) = std::process::Command::new("/sbin/ifconfig")
+        .arg(&dev)
         .output()
     {
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let lower = stdout.to_lowercase();
-        if lower.contains("not associated") {
-            return info;
-        }
-        if let Some((_, val)) = stdout.split_once(':') {
-            let ssid = val.trim().to_string();
-            if !ssid.is_empty() {
+        for line in stdout.lines() {
+            let t = line.trim();
+            if t == "status: active" || t.starts_with("status: active") {
                 info.is_wifi = true;
-                if ssid != "<redacted>" {
-                    info.ssid = Some(ssid);
-                } else {
-                    info.location_blocked = true;
+            } else if let Some(rest) = t.strip_prefix("inet ") {
+                let ip = rest.split_whitespace().next().unwrap_or("");
+                if !ip.is_empty() && !ip.starts_with("127.") && !ip.starts_with("169.254.") {
+                    info.is_wifi = true;
                 }
             }
         }
     }
 
-    if info.ssid.is_none() {
-        if let Ok(output) = std::process::Command::new("ipconfig")
-            .args(["getsummary", &dev])
-            .output()
-        {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines() {
-                let t = line.trim();
-                if t.starts_with("LinkStatusActive") && t.contains("TRUE") {
-                    info.is_wifi = true;
-                } else if t.starts_with("SSID :") || t.starts_with("SSID:") {
-                    if let Some((_, val)) = t.split_once(':') {
-                        let ssid = val.trim().to_string();
-                        if !ssid.is_empty() {
-                            info.is_wifi = true;
-                            if ssid == "<redacted>" {
-                                info.location_blocked = true;
-                            } else {
-                                info.ssid = Some(ssid);
-                                info.location_blocked = false;
-                            }
+    // 2. Inspect ipconfig getsummary <dev> for LinkStatusActive and SSID
+    if let Ok(output) = std::process::Command::new("/usr/sbin/ipconfig")
+        .args(["getsummary", &dev])
+        .output()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let t = line.trim();
+            if t.starts_with("LinkStatusActive") && t.contains("TRUE") {
+                info.is_wifi = true;
+            } else if t.starts_with("SSID :") || t.starts_with("SSID:") {
+                if let Some((_, val)) = t.split_once(':') {
+                    let ssid = val.trim().to_string();
+                    if !ssid.is_empty() {
+                        info.is_wifi = true;
+                        if ssid == "<redacted>" {
+                            info.location_blocked = true;
+                        } else {
+                            info.ssid = Some(ssid);
+                            info.location_blocked = false;
                         }
                     }
                 }
@@ -366,8 +395,29 @@ fn get_macos_wifi_info() -> WifiInfo {
         }
     }
 
+    // 3. Only try networksetup if Wi-Fi is active and SSID still missing; NEVER early-return on "not associated"!
+    if info.is_wifi && info.ssid.is_none() {
+        if let Ok(output) = std::process::Command::new("/usr/sbin/networksetup")
+            .args(["-getairportnetwork", &dev])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let lower = stdout.to_lowercase();
+            if lower.contains("current wi-fi network:") || lower.contains("current airport network:") {
+                if let Some((_, val)) = stdout.split_once(':') {
+                    let ssid = val.trim().to_string();
+                    if !ssid.is_empty() && ssid != "<redacted>" {
+                        info.ssid = Some(ssid);
+                        info.location_blocked = false;
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Query DHCP router / default gateway + domain_name whenever Wi-Fi is active
     if info.is_wifi {
-        if let Ok(output) = std::process::Command::new("ipconfig")
+        if let Ok(output) = std::process::Command::new("/usr/sbin/ipconfig")
             .args(["getoption", &dev, "router"])
             .output()
         {
@@ -375,6 +425,39 @@ fn get_macos_wifi_info() -> WifiInfo {
             if !gw.is_empty() {
                 info.gateway_ip = Some(gw);
             }
+        }
+
+        if info.gateway_ip.is_none() {
+            if let Ok(output) = std::process::Command::new("/sbin/route")
+                .args(["-n", "get", "default"])
+                .output()
+            {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    let t = line.trim();
+                    if let Some(rest) = t.strip_prefix("gateway:") {
+                        let gw = rest.trim();
+                        if !gw.is_empty() {
+                            info.gateway_ip = Some(gw.to_string());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Ok(output) = std::process::Command::new("/usr/sbin/ipconfig")
+            .args(["getoption", &dev, "domain_name"])
+            .output()
+        {
+            let dom = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !dom.is_empty() {
+                info.domain_name = Some(dom);
+            }
+        }
+
+        if info.ssid.is_none() {
+            info.location_blocked = true;
         }
     }
 

@@ -86,6 +86,8 @@ pub struct AppState {
     pub auth_failed: bool,
     #[serde(default)]
     pub last_error: Option<String>,
+    #[serde(default)]
+    pub known_ciup_gateways: Vec<String>,
 }
 
 impl Default for AppState {
@@ -98,6 +100,21 @@ impl Default for AppState {
             last_portal_url: None,
             auth_failed: false,
             last_error: None,
+            known_ciup_gateways: Vec::new(),
+        }
+    }
+}
+
+impl AppState {
+    pub fn record_ciup_gateway(&mut self, gw: Option<&str>) {
+        if let Some(raw) = gw {
+            let clean = raw.trim();
+            if !clean.is_empty() && !self.known_ciup_gateways.iter().any(|g| g == clean) {
+                self.known_ciup_gateways.push(clean.to_string());
+                if self.known_ciup_gateways.len() > 8 {
+                    self.known_ciup_gateways.remove(0);
+                }
+            }
         }
     }
 }

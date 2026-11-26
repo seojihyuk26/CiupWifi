@@ -173,6 +173,7 @@ pub fn run_daemon() {
         let mut was_on_wificity = false;
         let mut last_probe_at: Option<Instant> = None;
         let mut consecutive_failures: u32 = 0;
+        let mut unknown_ssid_probed = false;
 
         loop {
             let mut app_state = state::load_state(None);
@@ -181,14 +182,36 @@ pub fn run_daemon() {
             }
 
             let wifi_info = wifi::get_current_wifi_info();
-            let on_wificity = match wifi_info.ssid {
-                Some(ref ssid) => wifi::is_wificity_ssid(ssid),
-                None if wifi_info.is_wifi && wifi_info.location_blocked => wifi_info
-                    .gateway_ip
-                    .as_deref()
-                    .map(wifi::is_ciup_gateway)
-                    .unwrap_or(false),
-                None => false,
+            let gw = wifi_info.gateway_ip.as_deref();
+            let on_wificity = match wifi::is_known_wificity_without_probe(&wifi_info, &app_state) {
+                Some(b) => {
+                    unknown_ssid_probed = false;
+                    b
+                }
+                None => {
+                    if !unknown_ssid_probed {
+                        unknown_ssid_probed = true;
+                        match portal::probe_connectivity(gw).await {
+                            portal::ProbeResult::Captive {
+                                portal_url,
+                                initial_html,
+                            } if portal::is_ciup_portal(
+                                gw,
+                                Some(&portal_url),
+                                initial_html.as_deref(),
+                                &app_state.known_ciup_gateways,
+                            ) =>
+                            {
+                                app_state.record_ciup_gateway(gw);
+                                let _ = state::save_state(None, &app_state);
+                                true
+                            }
+                            _ => false,
+                        }
+                    } else {
+                        false
+                    }
+                }
             };
 
             if !was_on_wificity && on_wificity {
@@ -248,6 +271,7 @@ pub fn run_daemon() {
                                     } => {
                                         consecutive_failures = 0;
                                         let mut fresh = state::load_state(None);
+                                        fresh.record_ciup_gateway(gw);
                                         if portal_url.is_some() {
                                             fresh.last_portal_url = portal_url;
                                         }
@@ -294,6 +318,7 @@ pub fn run_daemon() {
             tokio::select! {
                 _ = notify.notified() => {
                     // Brief settle delay for DHCP/gateway assignment after OS Wi-Fi event
+                    unknown_ssid_probed = false;
                     tokio::time::sleep(Duration::from_millis(800)).await;
                 }
                 _ = tokio::time::sleep(next_wait) => {}

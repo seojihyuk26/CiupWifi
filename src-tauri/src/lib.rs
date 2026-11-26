@@ -45,14 +45,35 @@ pub fn run_headless() {
         }
 
         let wifi_info = wifi::get_current_wifi_info();
-        let on_wificity = match wifi_info.ssid {
-            Some(ref s) => wifi::is_wificity_ssid(s),
-            None if wifi_info.is_wifi && wifi_info.location_blocked => wifi_info
-                .gateway_ip
-                .as_deref()
-                .map(wifi::is_ciup_gateway)
-                .unwrap_or(false),
-            None => false,
+        let gw = wifi_info.gateway_ip.as_deref();
+
+        let on_wificity = match wifi::is_known_wificity_without_probe(&wifi_info, &app_state) {
+            Some(b) => b,
+            None => {
+                // SSID redacted by macOS/Windows and gateway unknown -> probe captive portal
+                let mut probe = portal::probe_connectivity(gw).await;
+                if matches!(probe, portal::ProbeResult::Offline) && wifi_info.is_wifi {
+                    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                    probe = portal::probe_connectivity(gw).await;
+                }
+                match probe {
+                    portal::ProbeResult::Captive {
+                        portal_url,
+                        initial_html,
+                    } if portal::is_ciup_portal(
+                        gw,
+                        Some(&portal_url),
+                        initial_html.as_deref(),
+                        &app_state.known_ciup_gateways,
+                    ) =>
+                    {
+                        app_state.record_ciup_gateway(gw);
+                        let _ = state::save_state(None, &app_state);
+                        true
+                    }
+                    _ => false,
+                }
+            }
         };
 
         if !on_wificity {
@@ -87,7 +108,6 @@ pub fn run_headless() {
             }
         };
 
-        let gw = wifi_info.gateway_ip.as_deref();
         if matches!(portal::probe_connectivity(gw).await, portal::ProbeResult::Online) {
             println!("[CiupWifi] WifiCity internet is already active.");
             return;
@@ -98,6 +118,7 @@ pub fn run_headless() {
             portal::LoginOutcome::Success { portal_url, logout_url } => {
                 let mut st = state::load_state(None);
                 st.was_on_wificity = true;
+                st.record_ciup_gateway(gw);
                 if portal_url.is_some() {
                     st.last_portal_url = portal_url;
                 }
@@ -127,44 +148,11 @@ pub mod commands {
     use crate::{daemon, portal, state, wifi};
     use reqwest::Client;
 
-    fn evaluate_wificity(wifi_info: &wifi::WifiInfo) -> (bool, bool) {
-        if let Some(ref ssid) = wifi_info.ssid {
-            (wifi::is_wificity_ssid(ssid), false)
-        } else if wifi_info.is_wifi && wifi_info.location_blocked {
-            let ciup_gw = wifi_info
-                .gateway_ip
-                .as_deref()
-                .map(wifi::is_ciup_gateway)
-                .unwrap_or(false);
-            (ciup_gw, !ciup_gw)
-        } else {
-            (false, false)
-        }
-    }
-
     #[tauri::command]
     pub async fn get_network_status(app: tauri::AppHandle) -> Result<state::NetworkStatus, String> {
-        let app_state = state::load_state(Some(&app));
+        let mut app_state = state::load_state(Some(&app));
         let wifi_info = wifi::get_current_wifi_info();
-        let (is_wificity, needs_location_perm) = evaluate_wificity(&wifi_info);
-
-        if needs_location_perm {
-            return Ok(state::NetworkStatus {
-                state: "permission_needed".to_string(),
-                ssid: None,
-                is_wifi: true,
-                is_cellular: false,
-                is_wificity: false,
-                user_paused: app_state.user_paused,
-                auto_enabled: app_state.auto_enabled,
-                auth_failed: app_state.auth_failed,
-                portal_url: app_state.last_portal_url,
-                detail: Some(
-                    "Enable Location access in OS settings so CiupWifi can verify the Wi-Fi network name (WifiCity)."
-                        .to_string(),
-                ),
-            });
-        }
+        let gw = wifi_info.gateway_ip.as_deref();
 
         if !wifi_info.is_wifi {
             return Ok(state::NetworkStatus {
@@ -181,7 +169,38 @@ pub mod commands {
             });
         }
 
+        let mut pre_probed: Option<portal::ProbeResult> = None;
+        let is_wificity = match wifi::is_known_wificity_without_probe(&wifi_info, &app_state) {
+            Some(b) => b,
+            None => {
+                let probe = portal::probe_connectivity(gw).await;
+                let matched = match &probe {
+                    portal::ProbeResult::Captive {
+                        portal_url,
+                        initial_html,
+                    } => portal::is_ciup_portal(
+                        gw,
+                        Some(portal_url),
+                        initial_html.as_deref(),
+                        &app_state.known_ciup_gateways,
+                    ),
+                    _ => false,
+                };
+                if matched {
+                    app_state.record_ciup_gateway(gw);
+                    let _ = state::save_state(Some(&app), &app_state);
+                }
+                pre_probed = Some(probe);
+                matched
+            }
+        };
+
         if !is_wificity {
+            let detail = if wifi_info.ssid.is_some() {
+                "Not connected to WifiCity.".to_string()
+            } else {
+                "Connected to another Wi-Fi network (Not WifiCity).".to_string()
+            };
             return Ok(state::NetworkStatus {
                 state: "not_on_wificity".to_string(),
                 ssid: wifi_info.ssid,
@@ -192,7 +211,7 @@ pub mod commands {
                 auto_enabled: app_state.auto_enabled,
                 auth_failed: app_state.auth_failed,
                 portal_url: None,
-                detail: Some("Not connected to WifiCity.".to_string()),
+                detail: Some(detail),
             });
         }
 
@@ -211,8 +230,12 @@ pub mod commands {
             });
         }
 
-        let gw = wifi_info.gateway_ip.as_deref();
-        match portal::probe_connectivity(gw).await {
+        let probe_res = match pre_probed {
+            Some(p) => p,
+            None => portal::probe_connectivity(gw).await,
+        };
+
+        match probe_res {
             portal::ProbeResult::Online => Ok(state::NetworkStatus {
                 state: "wifi_city_online".to_string(),
                 ssid: wifi_info.ssid.or_else(|| Some("WifiCity".to_string())),
@@ -258,19 +281,14 @@ pub mod commands {
         username: String,
         password: String,
     ) -> Result<serde_json::Value, String> {
+        let mut app_state = state::load_state(Some(&app));
         let wifi_info = wifi::get_current_wifi_info();
-        let (is_wificity, needs_location_perm) = evaluate_wificity(&wifi_info);
+        let gw = wifi_info.gateway_ip.as_deref();
 
-        if needs_location_perm {
-            return Ok(serde_json::json!({
-                "ok": false,
-                "reason": "permission_needed",
-                "auth_failed": false,
-                "message": "Enable Location access in OS settings so CiupWifi can verify WifiCity."
-            }));
-        }
-
-        if !wifi_info.is_wifi || !is_wificity {
+        if matches!(
+            wifi::is_known_wificity_without_probe(&wifi_info, &app_state),
+            Some(false)
+        ) {
             let msg = match wifi_info.ssid {
                 Some(ref s) => format!("Currently connected to '{}' (not WifiCity). Switch to WifiCity first.", s),
                 None => "Not connected to the WifiCity Wi-Fi network.".to_string(),
@@ -283,18 +301,18 @@ pub mod commands {
             }));
         }
 
-        let mut app_state = state::load_state(Some(&app));
         app_state.user_paused = false;
         app_state.auth_failed = false;
         app_state.last_error = None;
         let _ = state::save_state(Some(&app), &app_state);
 
-        let gw = wifi_info.gateway_ip.as_deref();
         match portal::login_to_portal(&username, &password, gw).await {
             portal::LoginOutcome::Success {
                 portal_url,
                 logout_url,
             } => {
+                app_state.was_on_wificity = true;
+                app_state.record_ciup_gateway(gw);
                 if let Some(ref p) = portal_url {
                     app_state.last_portal_url = Some(p.clone());
                 }

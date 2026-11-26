@@ -663,3 +663,34 @@ pub async fn logout_from_portal(logout_url: &str) {
         let _ = client.get(logout_url).send().await;
     }
 }
+
+pub fn is_ciup_portal(
+    gateway: Option<&str>,
+    portal_url: Option<&str>,
+    html: Option<&str>,
+    known_gateways: &[String],
+) -> bool {
+    if let Some(gw) = gateway {
+        let clean = gw.trim();
+        if clean.starts_with("10.254.") || known_gateways.iter().any(|k| k == clean) {
+            return true;
+        }
+    }
+    if let Some(u) = portal_url {
+        let lower = u.to_lowercase();
+        if lower.contains("10.254.")
+            || lower.contains("fgtauth")
+            || lower.contains("wificity")
+            || lower.contains("ciup")
+        {
+            return true;
+        }
+    }
+    if let Some(h) = html {
+        let lower = h.to_lowercase();
+        if lower.contains("ft_un") && lower.contains("ft_pd") {
+            return true;
+        }
+    }
+    false
+}
