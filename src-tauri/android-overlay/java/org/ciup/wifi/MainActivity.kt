@@ -3,38 +3,37 @@ package org.ciup.wifi
 import android.webkit.WebView
 
 class MainActivity : TauriActivity() {
-    private var webViewRef: WebView? = null
     private var bridge: WifiBridge? = null
 
     override fun onWebViewCreate(webView: WebView) {
         super.onWebViewCreate(webView)
-        webViewRef = webView
         val wifiBridge = WifiBridge(this, webView)
         bridge = wifiBridge
         webView.addJavascriptInterface(wifiBridge, "AndroidWifi")
 
-        WifiMonitorService.startMonitorIfConfigured(this)
+        val prefs = getSharedPreferences(WifiTriggerManager.PREFS_NAME, MODE_PRIVATE)
+        val user = prefs.getString(WifiTriggerManager.KEY_USERNAME, "") ?: ""
+        val pass = prefs.getString(WifiTriggerManager.KEY_PASSWORD, "") ?: ""
+        if (user.isNotEmpty() && pass.isNotEmpty() && prefs.getBoolean(WifiTriggerManager.KEY_AUTO_ENABLED, true)) {
+            WifiTriggerManager.register(this)
+        }
+
+        wifiBridge.startForegroundCallbacks()
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        WifiMonitorService.refreshState()
-        webViewRef?.post {
-            webViewRef?.evaluateJavascript(
-                "window.__onAndroidPermissionsChanged && window.__onAndroidPermissionsChanged();",
-                null
-            )
-        }
+    override fun onStart() {
+        super.onStart()
+        bridge?.startForegroundCallbacks()
+    }
+
+    override fun onStop() {
+        bridge?.stopForegroundCallbacks()
+        super.onStop()
     }
 
     override fun onDestroy() {
         bridge?.dispose()
         bridge = null
-        webViewRef = null
         super.onDestroy()
     }
 }

@@ -1,4 +1,4 @@
-// main.js — Unified frontend across Desktop (Tauri) and Android (Native WifiMonitorService)
+// main.js — Unified frontend across Desktop (Tauri) and Android (Native Event Triggers)
 const invoke = window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke;
 
 const hasAndroidBridge = () => typeof window.AndroidWifi !== 'undefined';
@@ -71,22 +71,8 @@ const Backend = {
         }
         return invoke('setup_background_task', { enable });
     },
-    getAndroidPermissions() {
-        if (!hasAndroidBridge()) return null;
-        try {
-            return JSON.parse(window.AndroidWifi.getPermissionsStatus());
-        } catch {
-            return null;
-        }
-    },
-    requestAndroidPermissions() {
-        if (hasAndroidBridge()) window.AndroidWifi.requestPermissions();
-    },
     openAndroidWifiSettings() {
         if (hasAndroidBridge()) window.AndroidWifi.openWifiSettings();
-    },
-    requestIgnoreBattery() {
-        if (hasAndroidBridge()) window.AndroidWifi.requestIgnoreBatteryOptimizations();
     },
 };
 
@@ -128,48 +114,6 @@ function formatPortalLabel(portalUrl) {
     }
 }
 
-function updateAndroidPermBanner() {
-    const banner = document.getElementById('perm-banner');
-    if (!hasAndroidBridge()) {
-        banner.style.display = 'none';
-        return;
-    }
-    const perms = Backend.getAndroidPermissions();
-    if (!perms) {
-        banner.style.display = 'none';
-        return;
-    }
-
-    const needLoc = !perms.locationGranted;
-    const needNotif = !perms.notificationsGranted;
-    const needBattery = !perms.batteryIgnored;
-
-    if (!needLoc && !needNotif && !needBattery) {
-        banner.style.display = 'none';
-        return;
-    }
-
-    const textEl = document.getElementById('perm-text');
-    const grantBtn = document.getElementById('btn-grant-perm');
-    const batBtn = document.getElementById('btn-battery-perm');
-
-    if (needLoc || needNotif) {
-        textEl.textContent = needLoc
-            ? 'Grant Location access so CiupWifi can detect WifiCity automatically.'
-            : 'Allow notifications so Android keeps auto-login active in the background.';
-        grantBtn.style.display = 'inline-block';
-    } else if (!perms.locationEnabled) {
-        textEl.textContent = 'Turn on device Location (GPS) so Android exposes the Wi-Fi name.';
-        grantBtn.style.display = 'none';
-    } else {
-        textEl.textContent = 'Disable battery optimization for reliable background Wi-Fi renewal.';
-        grantBtn.style.display = 'none';
-    }
-
-    batBtn.style.display = needBattery ? 'inline-block' : 'none';
-    banner.style.display = 'flex';
-}
-
 function showLoginView(showBackButton = false) {
     document.getElementById('card-status').style.display = 'none';
     document.getElementById('card-login').style.display = 'block';
@@ -191,11 +135,9 @@ function showLoginView(showBackButton = false) {
 
 function renderStatus(status) {
     lastStatus = status;
-    updateAndroidPermBanner();
 
     const hasCreds = Boolean(lastCreds.username && lastCreds.password);
 
-    // If user is explicitly editing credentials or has never saved any yet, stay on login card
     if (editingAccount || !hasCreds) {
         showLoginView(hasCreds);
         if (status.auth_failed && status.detail) {
@@ -204,7 +146,6 @@ function renderStatus(status) {
         return;
     }
 
-    // If auth failed on WifiCity with wrong password, surface the login card with the error
     if (status.state === 'wifi_city_captive' && status.auth_failed) {
         showLoginView(false);
         setLoginStatus(status.detail || 'Login rejected. Please verify username and password.', 'error');
@@ -255,9 +196,9 @@ function renderStatus(status) {
         netEl.textContent = `Online (${timeStr})`;
         netEl.className = 'value online';
         ssidEl.textContent = status.ssid || 'WifiCity';
-        autoEl.textContent = '⚡ Active (Auto-Reauth)';
+        autoEl.textContent = '⚡ Event-Triggered (Low Power)';
         autoEl.className = 'value text-emerald';
-        hintEl.textContent = 'WifiCity is online. If the connection drops, CiupWifi re-authenticates automatically.';
+        hintEl.textContent = 'You can close this window. Background trigger sleeps at 0% CPU until Wi-Fi changes or drops.';
         primaryBtn.textContent = 'Check Connection';
         primaryBtn.dataset.action = 'check';
         disconnectBtn.style.display = 'block';
@@ -270,7 +211,7 @@ function renderStatus(status) {
         netEl.textContent = 'Captive Portal';
         netEl.className = 'value warn';
         ssidEl.textContent = status.ssid || 'WifiCity';
-        autoEl.textContent = '⚡ Connecting…';
+        autoEl.textContent = '⚡ Authenticating…';
         autoEl.className = 'value text-amber';
         hintEl.textContent = 'Authenticating with the WifiCity portal automatically.';
         if (status.detail) setCardStatusMsg(status.detail, 'info');
@@ -294,16 +235,16 @@ function renderStatus(status) {
     } else if (status.state === 'permission_needed') {
         dot.classList.add('paused');
         ring.style.display = 'none';
-        title.textContent = 'Permission Needed';
-        sub.textContent = 'Cannot read current Wi-Fi name';
+        title.textContent = 'Location Off';
+        sub.textContent = 'OS hides Wi-Fi name';
         netEl.textContent = 'Wi-Fi (SSID hidden)';
         netEl.className = 'value warn';
         ssidEl.textContent = 'Hidden by OS';
-        autoEl.textContent = 'Waiting for permission';
+        autoEl.textContent = 'Enable OS Location';
         autoEl.className = 'value text-amber';
-        hintEl.textContent = status.detail || 'Enable Location access so CiupWifi can verify WifiCity.';
-        primaryBtn.textContent = hasAndroidBridge() ? 'Grant Permission' : 'Refresh Status';
-        primaryBtn.dataset.action = hasAndroidBridge() ? 'permission' : 'check';
+        hintEl.textContent = status.detail || 'Enable Location access in OS settings so CiupWifi can read the Wi-Fi name.';
+        primaryBtn.textContent = 'Refresh Status';
+        primaryBtn.dataset.action = 'check';
         disconnectBtn.style.display = 'none';
     } else if (status.state === 'not_on_wificity') {
         dot.classList.add('idle');
@@ -312,10 +253,10 @@ function renderStatus(status) {
         sub.textContent = status.detail || 'Connect to WifiCity to use auto-login';
         netEl.textContent = status.is_cellular ? 'Cellular (4G/5G)' : 'Other Wi-Fi';
         netEl.className = 'value muted';
-        ssidEl.textContent = status.is_cellular ? 'Wi-Fi Off / Inactive' : (status.ssid || 'Unknown');
-        autoEl.textContent = '🛡 Armed for WifiCity';
+        ssidEl.textContent = status.is_cellular ? 'Wi-Fi Inactive' : (status.ssid || 'Other Wi-Fi');
+        autoEl.textContent = '⚡ Event-Triggered (Low Power)';
         autoEl.className = 'value text-emerald';
-        hintEl.textContent = 'Join the "WifiCity" Wi-Fi network — CiupWifi will log in automatically.';
+        hintEl.textContent = 'Join "WifiCity" anytime — CiupWifi wakes up automatically and logs you in.';
         primaryBtn.textContent = 'Refresh Status';
         primaryBtn.dataset.action = 'check';
         disconnectBtn.style.display = 'none';
@@ -327,7 +268,7 @@ function renderStatus(status) {
         netEl.textContent = 'Offline';
         netEl.className = 'value muted';
         ssidEl.textContent = 'None';
-        autoEl.textContent = '🛡 Armed for WifiCity';
+        autoEl.textContent = '⚡ Event-Triggered (Low Power)';
         autoEl.className = 'value text-emerald';
         hintEl.textContent = 'Connect to "WifiCity" in your Wi-Fi settings and CiupWifi will handle login automatically.';
         primaryBtn.textContent = 'Refresh Status';
@@ -345,6 +286,14 @@ async function refreshStatus() {
         console.warn('[CiupWifi] Status check failed:', e);
         return null;
     }
+}
+
+function startPolling() {
+    if (statusInterval) clearInterval(statusInterval);
+    if (document.hidden) return;
+    statusInterval = setInterval(() => {
+        if (!document.hidden) refreshStatus();
+    }, 6000);
 }
 
 async function handleSaveAndConnect() {
@@ -369,14 +318,7 @@ async function handleSaveAndConnect() {
         const status = await Backend.getNetworkStatus();
         lastStatus = status;
 
-        if (!status.is_wificity) {
-            editingAccount = false;
-            clearLoginStatus();
-            renderStatus(status);
-            return;
-        }
-
-        if (status.state === 'wifi_city_online') {
+        if (!status.is_wificity || status.state === 'wifi_city_online') {
             editingAccount = false;
             clearLoginStatus();
             renderStatus(status);
@@ -405,11 +347,6 @@ async function handleSaveAndConnect() {
 async function handlePrimaryAction() {
     const btn = document.getElementById('btn-primary-action');
     const action = btn.dataset.action || 'check';
-
-    if (action === 'permission') {
-        Backend.requestAndroidPermissions();
-        return;
-    }
 
     btn.disabled = true;
     const origText = btn.textContent;
@@ -470,10 +407,18 @@ async function init() {
     window.__onAndroidWifiStatus = (status) => {
         if (status) renderStatus(status);
     };
-    window.__onAndroidPermissionsChanged = () => {
-        updateAndroidPermBanner();
-        refreshStatus();
-    };
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            if (statusInterval) {
+                clearInterval(statusInterval);
+                statusInterval = null;
+            }
+        } else {
+            refreshStatus();
+            startPolling();
+        }
+    });
 
     const creds = await Backend.loadCredentials().catch(() => ({ username: '', password: '' }));
     lastCreds = {
@@ -489,7 +434,6 @@ async function init() {
 
     const status = await refreshStatus();
 
-    // If already on WifiCity with captive portal and saved creds (and not paused / auth_failed), connect automatically
     if (
         status &&
         status.state === 'wifi_city_captive' &&
@@ -503,9 +447,7 @@ async function init() {
             .catch(() => {});
     }
 
-    if (statusInterval) clearInterval(statusInterval);
-    statusInterval = setInterval(refreshStatus, 4000);
-
+    startPolling();
     setTimeout(checkForUpdates, 1500);
 }
 
@@ -527,8 +469,6 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     clearLoginStatus();
     showLoginView(Boolean(lastCreds.username && lastCreds.password));
 });
-document.getElementById('btn-grant-perm').addEventListener('click', () => Backend.requestAndroidPermissions());
-document.getElementById('btn-battery-perm').addEventListener('click', () => Backend.requestIgnoreBattery());
 
 document.getElementById('btn-update').addEventListener('click', async () => {
     if (!pendingUpdate || !invoke) return;

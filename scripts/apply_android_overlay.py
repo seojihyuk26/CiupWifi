@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Applies the native Android Wi-Fi monitor overlay to Tauri's generated Android project."""
+"""Applies the zero-permission event-driven Android overlay to Tauri's generated Android project."""
 
 from pathlib import Path
 import shutil
@@ -9,18 +9,12 @@ import xml.etree.ElementTree as ET
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 ET.register_namespace("android", ANDROID_NS)
 
+# Minimal permissions: zero Location, zero Notification, zero Foreground Service
 REQUIRED_PERMISSIONS = [
     "android.permission.INTERNET",
     "android.permission.ACCESS_NETWORK_STATE",
     "android.permission.CHANGE_NETWORK_STATE",
-    "android.permission.ACCESS_WIFI_STATE",
-    "android.permission.ACCESS_FINE_LOCATION",
-    "android.permission.ACCESS_COARSE_LOCATION",
-    "android.permission.FOREGROUND_SERVICE",
-    "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
-    "android.permission.POST_NOTIFICATIONS",
     "android.permission.RECEIVE_BOOT_COMPLETED",
-    "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
 ]
 
 
@@ -50,44 +44,47 @@ def patch_manifest(manifest_path: Path) -> None:
 
     app_el.set(android_attr("usesCleartextTraffic"), "true")
 
-    # Service: .WifiMonitorService
-    service_name = ".WifiMonitorService"
-    has_service = any(
-        el.get(android_attr("name")) in (service_name, "org.ciup.wifi.WifiMonitorService")
-        for el in app_el.findall("service")
-    )
-    if not has_service:
-        service_el = ET.SubElement(
+    # Receiver: .WifiEventReceiver (OS-triggered ConnectivityManager PendingIntent)
+    if not any(
+        el.get(android_attr("name")) in (".WifiEventReceiver", "org.ciup.wifi.WifiEventReceiver")
+        for el in app_el.findall("receiver")
+    ):
+        ET.SubElement(
             app_el,
-            "service",
+            "receiver",
             {
-                android_attr("name"): service_name,
+                android_attr("name"): ".WifiEventReceiver",
                 android_attr("enabled"): "true",
                 android_attr("exported"): "false",
-                android_attr("foregroundServiceType"): "specialUse",
-            },
-        )
-        ET.SubElement(
-            service_el,
-            "property",
-            {
-                android_attr("name"): "android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE",
-                android_attr("value"): "Monitors WifiCity Wi-Fi connection and handles captive portal authentication automatically",
             },
         )
 
-    # Receiver: .BootReceiver
-    receiver_name = ".BootReceiver"
-    has_receiver = any(
-        el.get(android_attr("name")) in (receiver_name, "org.ciup.wifi.BootReceiver")
+    # Service: .WifiAuthJobService (JobScheduler captive-network wake trigger, API 28+)
+    if not any(
+        el.get(android_attr("name")) in (".WifiAuthJobService", "org.ciup.wifi.WifiAuthJobService")
+        for el in app_el.findall("service")
+    ):
+        ET.SubElement(
+            app_el,
+            "service",
+            {
+                android_attr("name"): ".WifiAuthJobService",
+                android_attr("permission"): "android.permission.BIND_JOB_SERVICE",
+                android_attr("enabled"): "true",
+                android_attr("exported"): "false",
+            },
+        )
+
+    # Receiver: .BootReceiver (re-registers triggers after device reboot / app update)
+    if not any(
+        el.get(android_attr("name")) in (".BootReceiver", "org.ciup.wifi.BootReceiver")
         for el in app_el.findall("receiver")
-    )
-    if not has_receiver:
+    ):
         receiver_el = ET.SubElement(
             app_el,
             "receiver",
             {
-                android_attr("name"): receiver_name,
+                android_attr("name"): ".BootReceiver",
                 android_attr("enabled"): "true",
                 android_attr("exported"): "true",
             },
@@ -122,6 +119,12 @@ def apply_overlay(repo_root: Path) -> None:
         raise RuntimeError(f"Generated AndroidManifest.xml missing: {manifest_path}")
 
     target_java.mkdir(parents=True, exist_ok=True)
+    overlay_names = {p.name for p in overlay_java.glob("*.kt")}
+    for existing in target_java.glob("*.kt"):
+        if existing.name != "TauriActivity.kt" and existing.name not in overlay_names:
+            existing.unlink()
+            print(f"Removed stale {existing.name}")
+
     for src in sorted(overlay_java.glob("*.kt")):
         shutil.copy2(src, target_java / src.name)
         print(f"Copied {src.name} -> {target_java}")

@@ -1,5 +1,7 @@
 use crate::{portal, state, wifi};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::sync::Notify;
 
 struct DaemonLock {
     #[cfg(target_os = "windows")]
@@ -68,6 +70,95 @@ fn acquire_daemon_lock() -> Option<DaemonLock> {
     }
 }
 
+#[cfg(target_os = "windows")]
+struct WlanWatcher {
+    handle: windows_sys::Win32::Foundation::HANDLE,
+    ctx_ptr: *const Notify,
+}
+
+#[cfg(target_os = "windows")]
+unsafe impl Send for WlanWatcher {}
+
+#[cfg(target_os = "windows")]
+impl Drop for WlanWatcher {
+    fn drop(&mut self) {
+        use windows_sys::Win32::NetworkManagement::WiFi::{
+            WlanCloseHandle, WlanRegisterNotification,
+        };
+        unsafe {
+            WlanRegisterNotification(
+                self.handle,
+                0,
+                0,
+                None,
+                std::ptr::null(),
+                std::ptr::null(),
+                std::ptr::null_mut(),
+            );
+            WlanCloseHandle(self.handle, std::ptr::null());
+            drop(Arc::from_raw(self.ctx_ptr));
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn wlan_notify_callback(
+    data: *mut windows_sys::Win32::NetworkManagement::WiFi::L2_NOTIFICATION_DATA,
+    ctx: *mut std::ffi::c_void,
+) {
+    use windows_sys::Win32::NetworkManagement::WiFi::{
+        wlan_notification_acm_connection_attempt_fail, wlan_notification_acm_connection_complete,
+        wlan_notification_acm_disconnected,
+    };
+
+    if ctx.is_null() || data.is_null() {
+        return;
+    }
+    let code = (*data).NotificationCode as i32;
+    if code == wlan_notification_acm_connection_complete
+        || code == wlan_notification_acm_disconnected
+        || code == wlan_notification_acm_connection_attempt_fail
+    {
+        let notify = &*(ctx as *const Notify);
+        notify.notify_one();
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn start_wlan_watcher(notify: &Arc<Notify>) -> Option<WlanWatcher> {
+    use windows_sys::Win32::Foundation::{ERROR_SUCCESS, HANDLE};
+    use windows_sys::Win32::NetworkManagement::WiFi::{
+        WlanCloseHandle, WlanOpenHandle, WlanRegisterNotification, WLAN_NOTIFICATION_SOURCE_ACM,
+    };
+
+    unsafe {
+        let mut negotiated: u32 = 0;
+        let mut handle: HANDLE = 0 as HANDLE;
+        if WlanOpenHandle(2, std::ptr::null(), &mut negotiated, &mut handle) != ERROR_SUCCESS {
+            return None;
+        }
+        let raw_ctx = Arc::into_raw(Arc::clone(notify));
+        let res = WlanRegisterNotification(
+            handle,
+            WLAN_NOTIFICATION_SOURCE_ACM,
+            1,
+            Some(wlan_notify_callback),
+            raw_ctx as *const std::ffi::c_void,
+            std::ptr::null(),
+            std::ptr::null_mut(),
+        );
+        if res != ERROR_SUCCESS {
+            drop(Arc::from_raw(raw_ctx));
+            WlanCloseHandle(handle, std::ptr::null());
+            return None;
+        }
+        Some(WlanWatcher {
+            handle,
+            ctx_ptr: raw_ctx,
+        })
+    }
+}
+
 pub fn run_daemon() {
     let _lock = match acquire_daemon_lock() {
         Some(l) => l,
@@ -75,11 +166,9 @@ pub fn run_daemon() {
     };
 
     tauri::async_runtime::block_on(async move {
-        let poll_interval = if cfg!(target_os = "windows") {
-            Duration::from_secs(3)
-        } else {
-            Duration::from_secs(5)
-        };
+        let notify = Arc::new(Notify::new());
+        #[cfg(target_os = "windows")]
+        let _watcher = start_wlan_watcher(&notify);
 
         let mut was_on_wificity = false;
         let mut last_probe_at: Option<Instant> = None;
@@ -104,43 +193,40 @@ pub fn run_daemon() {
 
             if !was_on_wificity && on_wificity {
                 // Freshly joined WifiCity: clear manual pause / auth error and probe right away
-                if app_state.user_paused || app_state.auth_failed || app_state.last_error.is_some()
-                {
-                    app_state.user_paused = false;
-                    app_state.auth_failed = false;
-                    app_state.last_error = None;
-                    let _ = state::save_state(None, &app_state);
-                }
+                app_state.was_on_wificity = true;
+                app_state.user_paused = false;
+                app_state.auth_failed = false;
+                app_state.last_error = None;
+                let _ = state::save_state(None, &app_state);
                 consecutive_failures = 0;
                 last_probe_at = None;
             } else if was_on_wificity && !on_wificity {
                 // Left WifiCity: reset pause/auth flags so next join auto-connects
-                if app_state.user_paused || app_state.auth_failed || app_state.last_error.is_some()
-                {
-                    app_state.user_paused = false;
-                    app_state.auth_failed = false;
-                    app_state.last_error = None;
-                    let _ = state::save_state(None, &app_state);
-                }
+                app_state.was_on_wificity = false;
+                app_state.user_paused = false;
+                app_state.auth_failed = false;
+                app_state.last_error = None;
+                let _ = state::save_state(None, &app_state);
                 consecutive_failures = 0;
                 last_probe_at = None;
             }
 
             was_on_wificity = on_wificity;
 
+            let mut next_wait = Duration::from_secs(60);
+
             if on_wificity && !app_state.user_paused && !app_state.auth_failed {
+                let cadence_secs = if consecutive_failures == 0 {
+                    180u64
+                } else {
+                    let backoff = [5u64, 15, 30, 60];
+                    let idx = ((consecutive_failures - 1) as usize).min(backoff.len() - 1);
+                    backoff[idx]
+                };
+
                 let due = match last_probe_at {
                     None => true,
-                    Some(prev) => {
-                        let wait_secs = if consecutive_failures == 0 {
-                            30
-                        } else {
-                            let backoff = [5u64, 10, 20, 30];
-                            let idx = ((consecutive_failures - 1) as usize).min(backoff.len() - 1);
-                            backoff[idx]
-                        };
-                        prev.elapsed() >= Duration::from_secs(wait_secs)
-                    }
+                    Some(prev) => prev.elapsed() >= Duration::from_secs(cadence_secs),
                 };
 
                 if due {
@@ -189,9 +275,29 @@ pub fn run_daemon() {
                         }
                     }
                 }
+
+                let wait_secs = if consecutive_failures == 0 {
+                    180u64
+                } else {
+                    let backoff = [5u64, 15, 30, 60];
+                    let idx = ((consecutive_failures - 1) as usize).min(backoff.len() - 1);
+                    backoff[idx]
+                };
+                next_wait = Duration::from_secs(wait_secs);
+            } else {
+                #[cfg(not(target_os = "windows"))]
+                {
+                    next_wait = Duration::from_secs(15);
+                }
             }
 
-            tokio::time::sleep(poll_interval).await;
+            tokio::select! {
+                _ = notify.notified() => {
+                    // Brief settle delay for DHCP/gateway assignment after OS Wi-Fi event
+                    tokio::time::sleep(Duration::from_millis(800)).await;
+                }
+                _ = tokio::time::sleep(next_wait) => {}
+            }
         }
     });
 }
@@ -217,8 +323,8 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
             const CREATE_NO_WINDOW: u32 = 0x08000000;
             const DETACHED_PROCESS: u32 = 0x00000008;
 
-            // Remove legacy periodic tasks so we don't stack old --silent runs
-            for legacy in ["CiupWifiAuto", "CiupWifiLogon"] {
+            // Remove legacy Task Scheduler jobs (including old schtasks that required admin on some systems)
+            for legacy in ["CiupWifiAuto", "CiupWifiLogon", "CiupWifiDaemon"] {
                 let _ = std::process::Command::new("schtasks")
                     .args(["/delete", "/tn", legacy, "/f"])
                     .creation_flags(CREATE_NO_WINDOW)
@@ -226,15 +332,16 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
             }
 
             if enable {
-                let _ = std::process::Command::new("schtasks")
+                let _ = std::process::Command::new("reg")
                     .args([
-                        "/create",
-                        "/tn",
-                        "CiupWifiDaemon",
-                        "/tr",
+                        "add",
+                        r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+                        "/v",
+                        "CiupWifi",
+                        "/t",
+                        "REG_SZ",
+                        "/d",
                         &format!("\"{}\" --daemon", exe_path),
-                        "/sc",
-                        "onlogon",
                         "/f",
                     ])
                     .creation_flags(CREATE_NO_WINDOW)
@@ -245,8 +352,14 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
                     .creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS)
                     .spawn();
             } else {
-                let _ = std::process::Command::new("schtasks")
-                    .args(["/delete", "/tn", "CiupWifiDaemon", "/f"])
+                let _ = std::process::Command::new("reg")
+                    .args([
+                        "delete",
+                        r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+                        "/v",
+                        "CiupWifi",
+                        "/f",
+                    ])
                     .creation_flags(CREATE_NO_WINDOW)
                     .output();
             }
@@ -257,10 +370,19 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
             if let Ok(home) = std::env::var("HOME") {
                 let plist_path = std::path::PathBuf::from(home)
                     .join("Library/LaunchAgents/org.ciup.wifi.plist");
+                let plist_str = plist_path.to_str().unwrap_or("");
+                let uid_out = std::process::Command::new("id").arg("-u").output();
+                let domain_target = uid_out
+                    .ok()
+                    .and_then(|o| String::from_utf8(o.stdout).ok())
+                    .map(|s| format!("gui/{}", s.trim()))
+                    .unwrap_or_else(|| "gui/501".to_string());
+
                 if enable {
                     if let Some(parent) = plist_path.parent() {
                         let _ = std::fs::create_dir_all(parent);
                     }
+                    // Event-driven LaunchAgent: runs --silent on network change and exits (0 MB RAM when idle)
                     let plist_content = format!(
                         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -271,28 +393,43 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
     <key>ProgramArguments</key>
     <array>
         <string>{}</string>
-        <string>--daemon</string>
+        <string>--silent</string>
     </array>
+    <key>WatchPaths</key>
+    <array>
+        <string>/Library/Preferences/SystemConfiguration</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>180</integer>
     <key>RunAtLoad</key>
     <true/>
-    <key>KeepAlive</key>
-    <true/>
     <key>ThrottleInterval</key>
-    <integer>10</integer>
+    <integer>5</integer>
 </dict>
 </plist>"#,
                         exe_path
                     );
                     let _ = std::fs::write(&plist_path, plist_content);
                     let _ = std::process::Command::new("launchctl")
-                        .args(["unload", plist_path.to_str().unwrap_or("")])
+                        .args(["bootout", &domain_target, plist_str])
                         .output();
-                    let _ = std::process::Command::new("launchctl")
-                        .args(["load", "-w", plist_path.to_str().unwrap_or("")])
+                    let boot = std::process::Command::new("launchctl")
+                        .args(["bootstrap", &domain_target, plist_str])
                         .output();
+                    if !boot.map(|o| o.status.success()).unwrap_or(false) {
+                        let _ = std::process::Command::new("launchctl")
+                            .args(["unload", plist_str])
+                            .output();
+                        let _ = std::process::Command::new("launchctl")
+                            .args(["load", "-w", plist_str])
+                            .output();
+                    }
                 } else {
                     let _ = std::process::Command::new("launchctl")
-                        .args(["unload", plist_path.to_str().unwrap_or("")])
+                        .args(["bootout", &domain_target, plist_str])
+                        .output();
+                    let _ = std::process::Command::new("launchctl")
+                        .args(["unload", plist_str])
                         .output();
                     let _ = std::fs::remove_file(&plist_path);
                 }

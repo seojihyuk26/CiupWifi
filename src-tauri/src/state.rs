@@ -77,6 +77,8 @@ pub struct AppState {
     #[serde(default)]
     pub user_paused: bool,
     #[serde(default)]
+    pub was_on_wificity: bool,
+    #[serde(default)]
     pub last_logout_url: Option<String>,
     #[serde(default)]
     pub last_portal_url: Option<String>,
@@ -91,6 +93,7 @@ impl Default for AppState {
         Self {
             auto_enabled: true,
             user_paused: false,
+            was_on_wificity: false,
             last_logout_url: None,
             last_portal_url: None,
             auth_failed: false,

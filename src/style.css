@@ -86,44 +86,6 @@ body {
   transform: none;
 }
 
-/* ── Permission Banner ── */
-.perm-banner {
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #fde68a;
-  padding: 10px 14px;
-  border-radius: 14px;
-  font-size: 12px;
-  line-height: 1.35;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.perm-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.btn-perm {
-  background: #f59e0b;
-  color: #0f172a;
-  border: none;
-  border-radius: 9999px;
-  padding: 5px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.btn-perm-secondary {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fde68a;
-}
-
 /* ── Glass Card ── */
 .card {
   background: rgba(17, 24, 39, 0.75);

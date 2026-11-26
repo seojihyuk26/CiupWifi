@@ -6,6 +6,18 @@ pub mod wifi;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(not(target_os = "android"))]
+            {
+                let st = state::load_state(Some(app.handle()));
+                if st.auto_enabled && state::load_credentials_direct(Some(app.handle())).is_some() {
+                    let _ = daemon::setup_background_task_internal(true);
+                }
+            }
+            #[cfg(target_os = "android")]
+            let _ = app;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             crate::commands::get_network_status,
             crate::commands::login_to_portal,
@@ -27,8 +39,8 @@ pub fn run_daemon() {
 
 pub fn run_headless() {
     tauri::async_runtime::block_on(async {
-        let app_state = state::load_state(None);
-        if app_state.user_paused || !app_state.auto_enabled {
+        let mut app_state = state::load_state(None);
+        if !app_state.auto_enabled {
             return;
         }
 
@@ -44,6 +56,26 @@ pub fn run_headless() {
         };
 
         if !on_wificity {
+            if app_state.was_on_wificity || app_state.user_paused || app_state.auth_failed {
+                app_state.was_on_wificity = false;
+                app_state.user_paused = false;
+                app_state.auth_failed = false;
+                app_state.last_error = None;
+                let _ = state::save_state(None, &app_state);
+            }
+            return;
+        }
+
+        if !app_state.was_on_wificity {
+            // Freshly joined WifiCity: resume auto-login automatically
+            app_state.was_on_wificity = true;
+            app_state.user_paused = false;
+            app_state.auth_failed = false;
+            app_state.last_error = None;
+            let _ = state::save_state(None, &app_state);
+        }
+
+        if app_state.user_paused || app_state.auth_failed {
             return;
         }
 
@@ -65,6 +97,7 @@ pub fn run_headless() {
         match portal::login_to_portal(&creds.username, &creds.password, gw).await {
             portal::LoginOutcome::Success { portal_url, logout_url } => {
                 let mut st = state::load_state(None);
+                st.was_on_wificity = true;
                 if portal_url.is_some() {
                     st.last_portal_url = portal_url;
                 }
