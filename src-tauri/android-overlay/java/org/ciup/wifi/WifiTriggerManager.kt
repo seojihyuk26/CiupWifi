@@ -13,12 +13,14 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
+import android.util.Log
 import org.json.JSONObject
 import java.net.Inet4Address
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 object WifiTriggerManager {
+    private const val TAG = "CiupWifi"
     const val PREFS_NAME = "ciupwifi_prefs"
     const val KEY_USERNAME = "username"
     const val KEY_PASSWORD = "password"
@@ -32,9 +34,11 @@ object WifiTriggerManager {
     const val KEY_LAST_AUTH_NET_HANDLE = "last_auth_net_handle"
     const val KEY_KNOWN_GATEWAYS = "known_ciup_gateways"
 
-    private const val ACTION_CAPTIVE_EVENT = "org.ciup.wifi.ACTION_CAPTIVE_EVENT"
+    const val ACTION_CAPTIVE_EVENT = "org.ciup.wifi.ACTION_CAPTIVE_EVENT"
+    const val ACTION_WIFI_EVENT = "org.ciup.wifi.ACTION_WIFI_EVENT"
     private const val REQ_CAPTIVE_PI = 2610
-    private const val JOB_ID_CAPTIVE = 2611
+    private const val REQ_WIFI_PI = 2612
+    private const val JOB_ID_RETRY = 2613
 
     private val authInFlight = AtomicBoolean(false)
 
@@ -47,16 +51,22 @@ object WifiTriggerManager {
             .addCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)
             .build()
 
-    private fun getCaptivePendingIntent(context: Context): PendingIntent {
+    private fun buildWifiRequest(): NetworkRequest =
+        NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .build()
+
+    private fun getMutablePendingIntent(context: Context, action: String, reqCode: Int): PendingIntent {
         val intent = Intent(context, WifiEventReceiver::class.java).apply {
-            action = ACTION_CAPTIVE_EVENT
+            this.action = action
         }
-        return PendingIntent.getBroadcast(
-            context,
-            REQ_CAPTIVE_PI,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        // Android 12+ requires FLAG_MUTABLE so ConnectivityManager can attach EXTRA_NETWORK
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        return PendingIntent.getBroadcast(context, reqCode, intent, flags)
     }
 
     fun register(context: Context) {
@@ -65,47 +75,61 @@ object WifiTriggerManager {
         if (!p.getBoolean(KEY_AUTO_ENABLED, true)) return
 
         val cm = appCtx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
-        val req = buildCaptiveRequest()
         try {
-            cm.registerNetworkCallback(req, getCaptivePendingIntent(appCtx))
-        } catch (_: Exception) {
+            cm.registerNetworkCallback(
+                buildCaptiveRequest(),
+                getMutablePendingIntent(appCtx, ACTION_CAPTIVE_EVENT, REQ_CAPTIVE_PI)
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register captive network callback: ${e.message}")
         }
-        scheduleCaptiveJob(appCtx, delayMs = 0L)
+        try {
+            cm.registerNetworkCallback(
+                buildWifiRequest(),
+                getMutablePendingIntent(appCtx, ACTION_WIFI_EVENT, REQ_WIFI_PI)
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register wifi network callback: ${e.message}")
+        }
     }
 
-    fun scheduleCaptiveJob(context: Context, delayMs: Long = 0L) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+    fun scheduleRetryJob(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return
         val appCtx = context.applicationContext
         val p = prefs(appCtx)
         if (!p.getBoolean(KEY_AUTO_ENABLED, true)) return
 
         val js = appCtx.getSystemService(Context.JOB_SCHEDULER_SERVICE) as? JobScheduler ?: return
         val builder = JobInfo.Builder(
-            JOB_ID_CAPTIVE,
+            JOB_ID_RETRY,
             ComponentName(appCtx, WifiAuthJobService::class.java)
         )
-            .setRequiredNetwork(buildCaptiveRequest())
-            .setPersisted(true)
-        if (delayMs > 0L) {
-            builder.setMinimumLatency(delayMs)
-        }
+            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
+            .setMinimumLatency(6_000L)
+            .setOverrideDeadline(30_000L)
         try {
             js.schedule(builder.build())
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to schedule retry job: ${e.message}")
         }
     }
 
     fun unregister(context: Context) {
         val appCtx = context.applicationContext
         val cm = appCtx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        try {
-            cm?.unregisterNetworkCallback(getCaptivePendingIntent(appCtx))
-        } catch (_: Exception) {
+        for ((action, code) in listOf(
+            ACTION_CAPTIVE_EVENT to REQ_CAPTIVE_PI,
+            ACTION_WIFI_EVENT to REQ_WIFI_PI
+        )) {
+            try {
+                cm?.unregisterNetworkCallback(getMutablePendingIntent(appCtx, action, code))
+            } catch (_: Exception) {
+            }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             val js = appCtx.getSystemService(Context.JOB_SCHEDULER_SERVICE) as? JobScheduler
             try {
-                js?.cancel(JOB_ID_CAPTIVE)
+                js?.cancel(JOB_ID_RETRY)
             } catch (_: Exception) {
             }
         }
@@ -148,6 +172,34 @@ object WifiTriggerManager {
         }
         val htmlLower = (html ?: "").lowercase(Locale.ROOT)
         return htmlLower.contains("ft_un") && htmlLower.contains("ft_pd")
+    }
+
+    fun handleWifiEvent(context: Context, network: Network, isCaptiveEvent: Boolean) {
+        val appCtx = context.applicationContext
+        val p = prefs(appCtx)
+        if (!p.getBoolean(KEY_AUTO_ENABLED, true)) return
+
+        val cm = appCtx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val caps = cm.getNetworkCapabilities(network)
+        var gateways = extractGateways(cm, network)
+
+        if (!isCaptiveEvent) {
+            val hasCaptive = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) == true
+            val isValidated = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+            // Fast 1ms exit when sitting on normal home Wi-Fi that is already validated
+            if (isValidated && !hasCaptive && !isCiupGateway(gateways, p)) {
+                return
+            }
+            if (gateways.isEmpty()) {
+                try {
+                    Thread.sleep(700)
+                } catch (_: InterruptedException) {
+                }
+                gateways = extractGateways(cm, network)
+            }
+        }
+
+        handleCaptiveNetwork(appCtx, network, forceUserInitiated = false)
     }
 
     fun handleCaptiveNetwork(
@@ -214,8 +266,9 @@ object WifiTriggerManager {
         try {
             val cm = appCtx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             val gateways = extractGateways(cm, network)
+            val probe = WifiPortalClient.probeConnectivity(network, gateways)
 
-            when (val probe = WifiPortalClient.probeConnectivity(network, gateways)) {
+            when (probe) {
                 is WifiPortalClient.ProbeResult.Online -> {
                     if (isCiupGateway(gateways, p) || p.getLong(KEY_LAST_AUTH_NET_HANDLE, -1L) == netHandle || forceUserInitiated) {
                         cm.reportNetworkConnectivity(network, true)
@@ -253,10 +306,18 @@ object WifiTriggerManager {
                             put("message", "Captive portal not detected on WifiCity.")
                         }.toString()
                     }
+                    if (!forceUserInitiated) {
+                        scheduleRetryJob(appCtx)
+                        return JSONObject().apply {
+                            put("ok", false)
+                            put("auth_failed", false)
+                            put("message", "Waiting for portal on WifiCity.")
+                        }.toString()
+                    }
                 }
             }
 
-            val res = WifiPortalClient.login(network, user, pass, gateways)
+            val res = WifiPortalClient.loginWithProbe(network, user, pass, gateways, probe)
             if (res.ok) {
                 cm.reportNetworkConnectivity(network, true)
                 val updatedKnown = (p.getStringSet(KEY_KNOWN_GATEWAYS, emptySet()) ?: emptySet()).toMutableSet()
@@ -278,6 +339,9 @@ object WifiTriggerManager {
                     .apply()
             } else {
                 p.edit().putString(KEY_LAST_ERROR, res.message).apply()
+                if (!forceUserInitiated) {
+                    scheduleRetryJob(appCtx)
+                }
             }
 
             return JSONObject().apply {

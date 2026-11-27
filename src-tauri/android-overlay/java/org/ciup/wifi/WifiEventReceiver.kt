@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Build
 import java.util.concurrent.Executors
 
@@ -15,20 +16,35 @@ class WifiEventReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        val network: Network? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val appCtx = context.applicationContext
+        val cm = appCtx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        var network: Network? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(ConnectivityManager.EXTRA_NETWORK, Network::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra(ConnectivityManager.EXTRA_NETWORK)
         }
 
+        if (network == null) {
+            @Suppress("DEPRECATION")
+            network = try {
+                cm.allNetworks.firstOrNull { net ->
+                    cm.getNetworkCapabilities(net)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
+
         if (network == null) return
 
+        val isCaptiveEvent = intent.action == WifiTriggerManager.ACTION_CAPTIVE_EVENT
+        val targetNetwork = network
         val pendingResult = goAsync()
-        val appCtx = context.applicationContext
         executor.execute {
             try {
-                WifiTriggerManager.handleCaptiveNetwork(appCtx, network, forceUserInitiated = false)
+                WifiTriggerManager.handleWifiEvent(appCtx, targetNetwork, isCaptiveEvent)
             } finally {
                 pendingResult.finish()
             }

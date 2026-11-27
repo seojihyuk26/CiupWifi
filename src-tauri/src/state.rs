@@ -88,6 +88,8 @@ pub struct AppState {
     pub last_error: Option<String>,
     #[serde(default)]
     pub known_ciup_gateways: Vec<String>,
+    #[serde(default)]
+    pub daemon_version: Option<String>,
 }
 
 impl Default for AppState {
@@ -101,6 +103,7 @@ impl Default for AppState {
             auth_failed: false,
             last_error: None,
             known_ciup_gateways: Vec::new(),
+            daemon_version: None,
         }
     }
 }
@@ -151,4 +154,27 @@ pub struct NetworkStatus {
     pub auth_failed: bool,
     pub portal_url: Option<String>,
     pub detail: Option<String>,
+}
+
+pub fn append_daemon_log(msg: &str) {
+    use std::io::Write;
+    let dir = get_app_dir(None);
+    let _ = std::fs::create_dir_all(&dir);
+    let log_path = dir.join("daemon.log");
+    if let Ok(meta) = std::fs::metadata(&log_path) {
+        if meta.len() > 32_768 {
+            let _ = std::fs::write(&log_path, "");
+        }
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let _ = writeln!(f, "[{}] {}", secs, msg);
+    }
 }

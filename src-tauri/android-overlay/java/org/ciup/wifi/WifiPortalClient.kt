@@ -252,7 +252,7 @@ object WifiPortalClient {
             var conn: HttpURLConnection? = null
             try {
                 val url = URL(endpoint)
-                conn = openBoundConnection(network, url, timeoutMs = 4000, acceptPortalCerts = true)
+                conn = openBoundConnection(network, url, timeoutMs = 2500, acceptPortalCerts = true)
                 val code = conn.responseCode
 
                 if (code == 204 && endpoint.contains("generate_204")) {
@@ -324,7 +324,7 @@ object WifiPortalClient {
                 var conn: HttpURLConnection? = null
                 try {
                     val url = URL("$scheme://$host$port/")
-                    conn = openBoundConnection(network, url, timeoutMs = 2500, acceptPortalCerts = true)
+                    conn = openBoundConnection(network, url, timeoutMs = 1200, acceptPortalCerts = true)
                     val code = conn.responseCode
                     val loc = conn.getHeaderField("Location")
                     if (!loc.isNullOrBlank()) {
@@ -374,8 +374,16 @@ object WifiPortalClient {
         username: String,
         password: String,
         gatewayHints: List<String> = emptyList()
+    ): LoginResult = loginWithProbe(network, username, password, gatewayHints, null)
+
+    fun loginWithProbe(
+        network: Network,
+        username: String,
+        password: String,
+        gatewayHints: List<String> = emptyList(),
+        existingProbe: ProbeResult? = null
     ): LoginResult {
-        val probe = probeConnectivity(network, gatewayHints)
+        val probe = existingProbe ?: probeConnectivity(network, gatewayHints)
         val (initialUrl, initialHtml) = when (probe) {
             is ProbeResult.Online -> return LoginResult(ok = true, message = "Already connected to WifiCity.")
             is ProbeResult.Offline -> return LoginResult(ok = false, message = "Captive portal not detected on WifiCity.")

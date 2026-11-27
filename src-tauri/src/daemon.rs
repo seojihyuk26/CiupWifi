@@ -31,7 +31,8 @@ fn acquire_daemon_lock() -> Option<DaemonLock> {
         use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS};
         use windows_sys::Win32::System::Threading::CreateMutexW;
 
-        let name: Vec<u16> = "Local\\CiupWifiDaemonMutex\0".encode_utf16().collect();
+        let mutex_name = format!("Local\\CiupWifiDaemonMutex_{}\0", env!("CARGO_PKG_VERSION"));
+        let name: Vec<u16> = mutex_name.encode_utf16().collect();
         let handle = CreateMutexW(std::ptr::null(), 0, name.as_ptr());
         if handle == 0 {
             return None;
@@ -159,16 +160,185 @@ fn start_wlan_watcher(notify: &Arc<Notify>) -> Option<WlanWatcher> {
     }
 }
 
+#[cfg(target_os = "macos")]
+mod macos_watcher {
+    use std::ffi::c_void;
+    use std::os::raw::c_char;
+    use std::sync::Arc;
+    use tokio::sync::Notify;
+
+    type CFIndex = isize;
+    type CFTypeRef = *const c_void;
+    type CFAllocatorRef = *const c_void;
+    type CFStringRef = *const c_void;
+    type CFArrayRef = *const c_void;
+    type CFRunLoopRef = *const c_void;
+    type CFRunLoopSourceRef = *const c_void;
+    type SCDynamicStoreRef = *const c_void;
+    type Boolean = u8;
+
+    #[repr(C)]
+    struct SCDynamicStoreContext {
+        version: CFIndex,
+        info: *mut c_void,
+        retain: Option<extern "C" fn(*const c_void) -> *const c_void>,
+        release: Option<extern "C" fn(*const c_void)>,
+        copy_description: Option<extern "C" fn(*const c_void) -> CFStringRef>,
+    }
+
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        static kCFAllocatorDefault: CFAllocatorRef;
+        static kCFTypeArrayCallBacks: c_void;
+        static kCFRunLoopDefaultMode: CFStringRef;
+        fn CFStringCreateWithCString(
+            alloc: CFAllocatorRef,
+            c_str: *const c_char,
+            encoding: u32,
+        ) -> CFStringRef;
+        fn CFArrayCreate(
+            alloc: CFAllocatorRef,
+            values: *const *const c_void,
+            num_values: CFIndex,
+            callbacks: *const c_void,
+        ) -> CFArrayRef;
+        fn CFRelease(cf: CFTypeRef);
+        fn CFRunLoopGetCurrent() -> CFRunLoopRef;
+        fn CFRunLoopAddSource(rl: CFRunLoopRef, source: CFRunLoopSourceRef, mode: CFStringRef);
+        fn CFRunLoopRun();
+    }
+
+    #[link(name = "SystemConfiguration", kind = "framework")]
+    extern "C" {
+        fn SCDynamicStoreCreate(
+            allocator: CFAllocatorRef,
+            name: CFStringRef,
+            callout: Option<extern "C" fn(SCDynamicStoreRef, CFArrayRef, *mut c_void)>,
+            context: *mut SCDynamicStoreContext,
+        ) -> SCDynamicStoreRef;
+        fn SCDynamicStoreSetNotificationKeys(
+            store: SCDynamicStoreRef,
+            keys: CFArrayRef,
+            patterns: CFArrayRef,
+        ) -> Boolean;
+        fn SCDynamicStoreCreateRunLoopSource(
+            allocator: CFAllocatorRef,
+            store: SCDynamicStoreRef,
+            order: CFIndex,
+        ) -> CFRunLoopSourceRef;
+    }
+
+    const K_CF_STRING_ENCODING_UTF8: u32 = 0x0800_0100;
+
+    extern "C" fn store_callback(
+        _store: SCDynamicStoreRef,
+        _changed_keys: CFArrayRef,
+        info: *mut c_void,
+    ) {
+        if !info.is_null() {
+            unsafe {
+                let notify = &*(info as *const Notify);
+                notify.notify_one();
+            }
+        }
+    }
+
+    pub fn spawn_network_watcher(notify: Arc<Notify>) {
+        std::thread::spawn(move || unsafe {
+            let name = CFStringCreateWithCString(
+                kCFAllocatorDefault,
+                b"org.ciup.wifi.watcher\0".as_ptr() as *const c_char,
+                K_CF_STRING_ENCODING_UTF8,
+            );
+            let raw_notify = Arc::into_raw(notify) as *mut c_void;
+            let mut ctx = SCDynamicStoreContext {
+                version: 0,
+                info: raw_notify,
+                retain: None,
+                release: None,
+                copy_description: None,
+            };
+            let store = SCDynamicStoreCreate(
+                kCFAllocatorDefault,
+                name,
+                Some(store_callback),
+                &mut ctx,
+            );
+            if !name.is_null() {
+                CFRelease(name);
+            }
+            if store.is_null() {
+                drop(Arc::from_raw(raw_notify as *const Notify));
+                return;
+            }
+
+            let pat1 = CFStringCreateWithCString(
+                kCFAllocatorDefault,
+                b"State:/Network/Interface/.*/IPv4\0".as_ptr() as *const c_char,
+                K_CF_STRING_ENCODING_UTF8,
+            );
+            let pat2 = CFStringCreateWithCString(
+                kCFAllocatorDefault,
+                b"State:/Network/Global/IPv4\0".as_ptr() as *const c_char,
+                K_CF_STRING_ENCODING_UTF8,
+            );
+            let vals = [pat1, pat2];
+            let patterns = CFArrayCreate(
+                kCFAllocatorDefault,
+                vals.as_ptr(),
+                2,
+                &kCFTypeArrayCallBacks as *const c_void,
+            );
+            let ok = SCDynamicStoreSetNotificationKeys(store, std::ptr::null(), patterns);
+            CFRelease(pat1);
+            CFRelease(pat2);
+            CFRelease(patterns);
+
+            if ok == 0 {
+                CFRelease(store);
+                drop(Arc::from_raw(raw_notify as *const Notify));
+                return;
+            }
+
+            let rl_src = SCDynamicStoreCreateRunLoopSource(kCFAllocatorDefault, store, 0);
+            if rl_src.is_null() {
+                CFRelease(store);
+                drop(Arc::from_raw(raw_notify as *const Notify));
+                return;
+            }
+
+            let rl = CFRunLoopGetCurrent();
+            CFRunLoopAddSource(rl, rl_src, kCFRunLoopDefaultMode);
+            CFRelease(rl_src);
+            CFRunLoopRun();
+        });
+    }
+}
+
+async fn wait_for_dhcp_settle() {
+    for _ in 0..10 {
+        let info = wifi::get_current_wifi_info();
+        if !info.is_wifi || info.gateway_ip.is_some() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+}
+
 pub fn run_daemon() {
     let _lock = match acquire_daemon_lock() {
         Some(l) => l,
         None => return,
     };
 
+    state::append_daemon_log(&format!("Daemon started (v{})", env!("CARGO_PKG_VERSION")));
+
     tauri::async_runtime::block_on(async move {
         let notify = Arc::new(Notify::new());
         #[cfg(target_os = "windows")]
         let _watcher = start_wlan_watcher(&notify);
+        #[cfg(target_os = "macos")]
+        macos_watcher::spawn_network_watcher(Arc::clone(&notify));
 
         let mut was_on_wificity = false;
         let mut last_probe_at: Option<Instant> = None;
@@ -178,11 +348,24 @@ pub fn run_daemon() {
         loop {
             let mut app_state = state::load_state(None);
             if !app_state.auto_enabled {
+                state::append_daemon_log("Daemon stopping (auto_enabled=false)");
                 break;
+            }
+            if let Some(ref expected_ver) = app_state.daemon_version {
+                if expected_ver != env!("CARGO_PKG_VERSION") {
+                    state::append_daemon_log(&format!(
+                        "Daemon exiting for upgrade ({} -> {})",
+                        env!("CARGO_PKG_VERSION"),
+                        expected_ver
+                    ));
+                    break;
+                }
             }
 
             let wifi_info = wifi::get_current_wifi_info();
             let gw = wifi_info.gateway_ip.as_deref();
+            let mut cached_probe: Option<portal::ProbeResult> = None;
+
             let on_wificity = match wifi::is_known_wificity_without_probe(&wifi_info, &app_state) {
                 Some(b) => {
                     unknown_ssid_probed = false;
@@ -190,23 +373,35 @@ pub fn run_daemon() {
                 }
                 None => {
                     if !unknown_ssid_probed {
-                        unknown_ssid_probed = true;
-                        match portal::probe_connectivity(gw).await {
+                        let probe = portal::probe_connectivity(gw).await;
+                        match &probe {
+                            portal::ProbeResult::Online => {
+                                unknown_ssid_probed = true;
+                                false
+                            }
                             portal::ProbeResult::Captive {
                                 portal_url,
                                 initial_html,
-                            } if portal::is_ciup_portal(
-                                gw,
-                                Some(&portal_url),
-                                initial_html.as_deref(),
-                                &app_state.known_ciup_gateways,
-                            ) =>
-                            {
-                                app_state.record_ciup_gateway(gw);
-                                let _ = state::save_state(None, &app_state);
-                                true
+                            } => {
+                                if portal::is_ciup_portal(
+                                    gw,
+                                    Some(portal_url),
+                                    initial_html.as_deref(),
+                                    &app_state.known_ciup_gateways,
+                                ) {
+                                    app_state.record_ciup_gateway(gw);
+                                    let _ = state::save_state(None, &app_state);
+                                    cached_probe = Some(probe);
+                                    true
+                                } else {
+                                    unknown_ssid_probed = true;
+                                    false
+                                }
                             }
-                            _ => false,
+                            portal::ProbeResult::Offline => {
+                                // Do not lock unknown_ssid_probed on Offline (DHCP/portal may still be settling)
+                                false
+                            }
                         }
                     } else {
                         false
@@ -215,7 +410,7 @@ pub fn run_daemon() {
             };
 
             if !was_on_wificity && on_wificity {
-                // Freshly joined WifiCity: clear manual pause / auth error and probe right away
+                state::append_daemon_log("Joined WifiCity; arming auto-login");
                 app_state.was_on_wificity = true;
                 app_state.user_paused = false;
                 app_state.auth_failed = false;
@@ -224,7 +419,7 @@ pub fn run_daemon() {
                 consecutive_failures = 0;
                 last_probe_at = None;
             } else if was_on_wificity && !on_wificity {
-                // Left WifiCity: reset pause/auth flags so next join auto-connects
+                state::append_daemon_log("Left WifiCity; resetting pause state");
                 app_state.was_on_wificity = false;
                 app_state.user_paused = false;
                 app_state.auth_failed = false;
@@ -236,11 +431,15 @@ pub fn run_daemon() {
 
             was_on_wificity = on_wificity;
 
-            let mut next_wait = Duration::from_secs(60);
+            let mut next_wait = if cfg!(any(target_os = "windows", target_os = "macos")) {
+                Duration::from_secs(60)
+            } else {
+                Duration::from_secs(15)
+            };
 
             if on_wificity && !app_state.user_paused && !app_state.auth_failed {
                 let cadence_secs = if consecutive_failures == 0 {
-                    180u64
+                    30u64
                 } else {
                     let backoff = [5u64, 15, 30, 60];
                     let idx = ((consecutive_failures - 1) as usize).min(backoff.len() - 1);
@@ -255,20 +454,29 @@ pub fn run_daemon() {
                 if due {
                     last_probe_at = Some(Instant::now());
                     if let Some(creds) = state::load_credentials_direct(None) {
-                        let gw = wifi_info.gateway_ip.as_deref();
-                        match portal::probe_connectivity(gw).await {
+                        let probe_res = match cached_probe.take() {
+                            Some(p) => p,
+                            None => portal::probe_connectivity(gw).await,
+                        };
+                        match probe_res {
                             portal::ProbeResult::Online => {
                                 consecutive_failures = 0;
                             }
-                            portal::ProbeResult::Captive { .. }
-                            | portal::ProbeResult::Offline => {
-                                match portal::login_to_portal(&creds.username, &creds.password, gw)
-                                    .await
+                            other @ (portal::ProbeResult::Captive { .. }
+                            | portal::ProbeResult::Offline) => {
+                                match portal::login_with_probe(
+                                    &creds.username,
+                                    &creds.password,
+                                    gw,
+                                    Some(other),
+                                )
+                                .await
                                 {
                                     portal::LoginOutcome::Success {
                                         portal_url,
                                         logout_url,
                                     } => {
+                                        state::append_daemon_log("Auto-login succeeded");
                                         consecutive_failures = 0;
                                         let mut fresh = state::load_state(None);
                                         fresh.record_ciup_gateway(gw);
@@ -283,12 +491,14 @@ pub fn run_daemon() {
                                         let _ = state::save_state(None, &fresh);
                                     }
                                     portal::LoginOutcome::AuthFailed(msg) => {
+                                        state::append_daemon_log(&format!("Auth failed: {}", msg));
                                         let mut fresh = state::load_state(None);
                                         fresh.auth_failed = true;
                                         fresh.last_error = Some(msg);
                                         let _ = state::save_state(None, &fresh);
                                     }
                                     portal::LoginOutcome::Error(msg) => {
+                                        state::append_daemon_log(&format!("Login retry error: {}", msg));
                                         consecutive_failures = consecutive_failures.saturating_add(1);
                                         let mut fresh = state::load_state(None);
                                         fresh.last_error = Some(msg);
@@ -301,25 +511,20 @@ pub fn run_daemon() {
                 }
 
                 let wait_secs = if consecutive_failures == 0 {
-                    180u64
+                    30u64
                 } else {
                     let backoff = [5u64, 15, 30, 60];
                     let idx = ((consecutive_failures - 1) as usize).min(backoff.len() - 1);
                     backoff[idx]
                 };
                 next_wait = Duration::from_secs(wait_secs);
-            } else {
-                #[cfg(not(target_os = "windows"))]
-                {
-                    next_wait = Duration::from_secs(15);
-                }
             }
 
             tokio::select! {
                 _ = notify.notified() => {
-                    // Brief settle delay for DHCP/gateway assignment after OS Wi-Fi event
                     unknown_ssid_probed = false;
-                    tokio::time::sleep(Duration::from_millis(800)).await;
+                    last_probe_at = None;
+                    wait_for_dhcp_settle().await;
                 }
                 _ = tokio::time::sleep(next_wait) => {}
             }
@@ -327,9 +532,22 @@ pub fn run_daemon() {
     });
 }
 
+#[cfg(target_os = "macos")]
+fn resolve_macos_exe(current_exe: &std::path::Path) -> String {
+    let raw = current_exe.to_string_lossy().to_string();
+    if raw.contains("AppTranslocation") || raw.contains("/Volumes/") {
+        let installed = std::path::Path::new("/Applications/CiupWifi.app/Contents/MacOS/ciupwifi");
+        if installed.exists() {
+            return installed.to_string_lossy().to_string();
+        }
+    }
+    raw
+}
+
 pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
     let mut app_state = state::load_state(None);
     app_state.auto_enabled = enable;
+    app_state.daemon_version = Some(env!("CARGO_PKG_VERSION").to_string());
     state::save_state(None, &app_state)?;
 
     #[cfg(target_os = "android")]
@@ -346,9 +564,7 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
         {
             use std::os::windows::process::CommandExt;
             const CREATE_NO_WINDOW: u32 = 0x08000000;
-            const DETACHED_PROCESS: u32 = 0x00000008;
 
-            // Remove legacy Task Scheduler jobs (including old schtasks that required admin on some systems)
             for legacy in ["CiupWifiAuto", "CiupWifiLogon", "CiupWifiDaemon"] {
                 let _ = std::process::Command::new("schtasks")
                     .args(["/delete", "/tn", legacy, "/f"])
@@ -372,9 +588,10 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
                     .creation_flags(CREATE_NO_WINDOW)
                     .output();
 
+                // Do NOT combine CREATE_NO_WINDOW with DETACHED_PROCESS (Windows ignores CREATE_NO_WINDOW)
                 let _ = std::process::Command::new(&current_exe)
                     .arg("--daemon")
-                    .creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS)
+                    .creation_flags(CREATE_NO_WINDOW)
                     .spawn();
             } else {
                 let _ = std::process::Command::new("reg")
@@ -392,6 +609,7 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
 
         #[cfg(target_os = "macos")]
         {
+            let stable_exe = resolve_macos_exe(&current_exe);
             if let Ok(home) = std::env::var("HOME") {
                 let plist_path = std::path::PathBuf::from(home)
                     .join("Library/LaunchAgents/org.ciup.wifi.plist");
@@ -402,12 +620,13 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
                     .and_then(|o| String::from_utf8(o.stdout).ok())
                     .map(|s| format!("gui/{}", s.trim()))
                     .unwrap_or_else(|| "gui/501".to_string());
+                let service_target = format!("{}/org.ciup.wifi", domain_target);
 
                 if enable {
                     if let Some(parent) = plist_path.parent() {
                         let _ = std::fs::create_dir_all(parent);
                     }
-                    // Event-driven LaunchAgent: runs --silent on network change and exits (0 MB RAM when idle)
+                    // Event-driven daemon using native SCDynamicStore (0% CPU when idle)
                     let plist_content = format!(
                         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -418,21 +637,17 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
     <key>ProgramArguments</key>
     <array>
         <string>{}</string>
-        <string>--silent</string>
+        <string>--daemon</string>
     </array>
-    <key>WatchPaths</key>
-    <array>
-        <string>/Library/Preferences/SystemConfiguration</string>
-    </array>
-    <key>StartInterval</key>
-    <integer>180</integer>
     <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
     <true/>
     <key>ThrottleInterval</key>
     <integer>5</integer>
 </dict>
 </plist>"#,
-                        exe_path
+                        stable_exe
                     );
                     let _ = std::fs::write(&plist_path, plist_content);
                     let _ = std::process::Command::new("launchctl")
@@ -441,7 +656,11 @@ pub fn setup_background_task_internal(enable: bool) -> Result<(), String> {
                     let boot = std::process::Command::new("launchctl")
                         .args(["bootstrap", &domain_target, plist_str])
                         .output();
-                    if !boot.map(|o| o.status.success()).unwrap_or(false) {
+                    if boot.map(|o| o.status.success()).unwrap_or(false) {
+                        let _ = std::process::Command::new("launchctl")
+                            .args(["kickstart", "-k", &service_target])
+                            .output();
+                    } else {
                         let _ = std::process::Command::new("launchctl")
                             .args(["unload", plist_str])
                             .output();

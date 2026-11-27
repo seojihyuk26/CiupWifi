@@ -47,6 +47,7 @@ pub fn run_headless() {
         let wifi_info = wifi::get_current_wifi_info();
         let gw = wifi_info.gateway_ip.as_deref();
 
+        let mut cached_probe: Option<portal::ProbeResult> = None;
         let on_wificity = match wifi::is_known_wificity_without_probe(&wifi_info, &app_state) {
             Some(b) => b,
             None => {
@@ -69,6 +70,10 @@ pub fn run_headless() {
                     {
                         app_state.record_ciup_gateway(gw);
                         let _ = state::save_state(None, &app_state);
+                        cached_probe = Some(portal::ProbeResult::Captive {
+                            portal_url,
+                            initial_html,
+                        });
                         true
                     }
                     _ => false,
@@ -108,13 +113,17 @@ pub fn run_headless() {
             }
         };
 
-        if matches!(portal::probe_connectivity(gw).await, portal::ProbeResult::Online) {
+        let probe_res = match cached_probe {
+            Some(p) => p,
+            None => portal::probe_connectivity(gw).await,
+        };
+        if matches!(probe_res, portal::ProbeResult::Online) {
             println!("[CiupWifi] WifiCity internet is already active.");
             return;
         }
 
         println!("[CiupWifi] Captive portal detected on WifiCity. Logging in as {}...", creds.username);
-        match portal::login_to_portal(&creds.username, &creds.password, gw).await {
+        match portal::login_with_probe(&creds.username, &creds.password, gw, Some(probe_res)).await {
             portal::LoginOutcome::Success { portal_url, logout_url } => {
                 let mut st = state::load_state(None);
                 st.was_on_wificity = true;

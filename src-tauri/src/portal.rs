@@ -24,7 +24,16 @@ pub enum LoginOutcome {
 
 fn build_probe_client() -> Result<Client, String> {
     Client::builder()
-        .timeout(Duration::from_secs(4))
+        .timeout(Duration::from_millis(2500))
+        .redirect(reqwest::redirect::Policy::none())
+        .danger_accept_invalid_certs(true)
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+fn build_fast_gateway_client() -> Result<Client, String> {
+    Client::builder()
+        .timeout(Duration::from_millis(1500))
         .redirect(reqwest::redirect::Policy::none())
         .danger_accept_invalid_certs(true)
         .build()
@@ -393,10 +402,11 @@ pub async fn probe_connectivity(gateway_hint: Option<&str>) -> ProbeResult {
         ("https", ""),
     ];
 
+    let gw_client = build_fast_gateway_client().unwrap_or(client);
     for host in hosts {
         for (scheme, port) in port_schemes {
             let url = format!("{}://{}{}/", scheme, host, port);
-            if let Ok(resp) = client.get(&url).send().await {
+            if let Ok(resp) = gw_client.get(&url).send().await {
                 let resp_url = resp.url().clone();
                 if let Some(loc) = resp
                     .headers()
@@ -437,7 +447,20 @@ pub async fn login_to_portal(
     password: &str,
     gateway_hint: Option<&str>,
 ) -> LoginOutcome {
-    let (initial_url, initial_html) = match probe_connectivity(gateway_hint).await {
+    login_with_probe(username, password, gateway_hint, None).await
+}
+
+pub async fn login_with_probe(
+    username: &str,
+    password: &str,
+    gateway_hint: Option<&str>,
+    existing_probe: Option<ProbeResult>,
+) -> LoginOutcome {
+    let probe = match existing_probe {
+        Some(p) => p,
+        None => probe_connectivity(gateway_hint).await,
+    };
+    let (initial_url, initial_html) = match probe {
         ProbeResult::Online => {
             return LoginOutcome::Success {
                 portal_url: None,
