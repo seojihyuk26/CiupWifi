@@ -386,6 +386,7 @@ async function handleDisconnect() {
 }
 
 async function checkForUpdates() {
+    if (hasAndroidBridge() || /Android/i.test(navigator.userAgent)) return;
     if (!invoke) return;
     try {
         const update = await invoke('check_for_updates');
@@ -477,10 +478,7 @@ document.getElementById('btn-update').addEventListener('click', async () => {
     btn.textContent = 'Updating…';
 
     try {
-        const isAndroid = /Android/i.test(navigator.userAgent);
-        if (isAndroid) {
-            window.location.href = pendingUpdate.download_url;
-            btn.textContent = 'Downloading…';
+        if (hasAndroidBridge() || /Android/i.test(navigator.userAgent)) {
             return;
         }
 

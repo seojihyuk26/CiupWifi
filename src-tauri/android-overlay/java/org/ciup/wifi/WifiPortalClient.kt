@@ -7,14 +7,8 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
 import java.util.Locale
-import javax.net.ssl.HostnameVerifier
-import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
+import javax.net.ssl.SSLException
 
 object WifiPortalClient {
 
@@ -32,24 +26,17 @@ object WifiPortalClient {
         val message: String = ""
     )
 
-    private val portalSslSocketFactory by lazy {
-        val trustAll = arrayOf<TrustManager>(object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-        })
-        val ctx = SSLContext.getInstance("TLS")
-        ctx.init(null, trustAll, SecureRandom())
-        ctx.socketFactory
-    }
-
-    private val portalHostnameVerifier = HostnameVerifier { _, _ -> true }
+    private data class HopResponse(
+        val effectiveUrl: URL,
+        val code: Int,
+        val location: String?,
+        val body: String
+    )
 
     private fun openBoundConnection(
         network: Network,
         url: URL,
-        timeoutMs: Int,
-        acceptPortalCerts: Boolean
+        timeoutMs: Int
     ): HttpURLConnection {
         val conn = network.openConnection(url) as HttpURLConnection
         conn.connectTimeout = timeoutMs
@@ -57,11 +44,66 @@ object WifiPortalClient {
         conn.instanceFollowRedirects = false
         conn.useCaches = false
         conn.setRequestProperty("Cache-Control", "no-cache")
-        if (acceptPortalCerts && conn is HttpsURLConnection) {
-            conn.sslSocketFactory = portalSslSocketFactory
-            conn.hostnameVerifier = portalHostnameVerifier
-        }
         return conn
+    }
+
+    private fun isPrivateIpv4(host: String): Boolean {
+        val parts = host.split('.')
+        if (parts.size != 4) return false
+        val octets = parts.map { it.toIntOrNull() ?: return false }
+        if (octets.any { it !in 0..255 }) return false
+        return octets[0] == 10 ||
+            (octets[0] == 192 && octets[1] == 168) ||
+            (octets[0] == 172 && octets[1] in 16..31)
+    }
+
+    private fun privateHttpFallbacks(url: URL): List<URL> {
+        if (!url.protocol.equals("https", ignoreCase = true) || !isPrivateIpv4(url.host)) {
+            return emptyList()
+        }
+        val file = if (url.file.isNullOrEmpty()) "/" else url.file
+        return listOfNotNull(
+            try { URL("http", url.host, 1000, file) } catch (_: Exception) { null },
+            try { URL("http", url.host, -1, file) } catch (_: Exception) { null }
+        )
+    }
+
+    private fun executeHttpHop(
+        network: Network,
+        targetUrl: URL,
+        timeoutMs: Int,
+        cookies: MutableMap<String, String>,
+        referer: String? = null,
+        formBody: String? = null
+    ): HopResponse {
+        val candidates = listOf(targetUrl) + privateHttpFallbacks(targetUrl)
+        var lastSslEx: SSLException? = null
+        for (candidate in candidates) {
+            var conn: HttpURLConnection? = null
+            try {
+                conn = openBoundConnection(network, candidate, timeoutMs)
+                applyCookies(conn, cookies)
+                if (referer != null) {
+                    conn.setRequestProperty("Referer", referer)
+                }
+                if (formBody != null) {
+                    conn.requestMethod = "POST"
+                    conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                    OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(formBody) }
+                }
+                val code = conn.responseCode
+                storeCookies(conn, cookies)
+                val loc = conn.getHeaderField("Location")
+                val body = if (code in 300..399 && !loc.isNullOrBlank()) "" else readBody(conn)
+                return HopResponse(candidate, code, loc, body)
+            } catch (e: SSLException) {
+                lastSslEx = e
+            } finally {
+                conn?.disconnect()
+            }
+        }
+        throw lastSslEx ?: SSLException("TLS connection failed for $targetUrl")
     }
 
     private fun readBody(conn: HttpURLConnection): String {
@@ -252,7 +294,7 @@ object WifiPortalClient {
             var conn: HttpURLConnection? = null
             try {
                 val url = URL(endpoint)
-                conn = openBoundConnection(network, url, timeoutMs = 2500, acceptPortalCerts = true)
+                conn = openBoundConnection(network, url, timeoutMs = 2500)
                 val code = conn.responseCode
 
                 if (code == 204 && endpoint.contains("generate_204")) {
@@ -313,9 +355,9 @@ object WifiPortalClient {
         val portSchemes = listOf(
             "http" to "",
             "http" to ":1000",
-            "https" to ":1003",
             "http" to ":8000",
             "http" to ":8080",
+            "https" to ":1003",
             "https" to ""
         )
 
@@ -324,7 +366,7 @@ object WifiPortalClient {
                 var conn: HttpURLConnection? = null
                 try {
                     val url = URL("$scheme://$host$port/")
-                    conn = openBoundConnection(network, url, timeoutMs = 1200, acceptPortalCerts = true)
+                    conn = openBoundConnection(network, url, timeoutMs = 1200)
                     val code = conn.responseCode
                     val loc = conn.getHeaderField("Location")
                     if (!loc.isNullOrBlank()) {
@@ -402,18 +444,15 @@ object WifiPortalClient {
 
         if (initialHtml == null) {
             for (hop in 0 until 6) {
-                var conn: HttpURLConnection? = null
                 try {
-                    conn = openBoundConnection(network, currentUrl, timeoutMs = 10000, acceptPortalCerts = true)
-                    applyCookies(conn, cookies)
-                    val code = conn.responseCode
-                    storeCookies(conn, cookies)
+                    val resp = executeHttpHop(network, currentUrl, timeoutMs = 10000, cookies = cookies)
+                    currentUrl = resp.effectiveUrl
                     if (magicToken == null) {
                         magicToken = extractMagicToken(currentUrl.toString())
                     }
 
-                    val loc = conn.getHeaderField("Location")
-                    if (code in 300..399 && !loc.isNullOrBlank()) {
+                    val loc = resp.location
+                    if (resp.code in 300..399 && !loc.isNullOrBlank()) {
                         val nextUrl = resolveUrl(currentUrl, loc)
                         if (nextUrl != null) {
                             currentUrl = nextUrl
@@ -421,7 +460,7 @@ object WifiPortalClient {
                         }
                     }
 
-                    htmlText = readBody(conn)
+                    htmlText = resp.body
                     if (looksLikeLoginForm(htmlText)) {
                         break
                     }
@@ -436,8 +475,6 @@ object WifiPortalClient {
                     break
                 } catch (e: Exception) {
                     return LoginResult(ok = false, message = "Failed to connect to captive portal: ${e.message}")
-                } finally {
-                    conn?.disconnect()
                 }
             }
         }
@@ -484,37 +521,30 @@ object WifiPortalClient {
             var methodPost = true
             var referer = currentUrl.toString()
             for (hop in 0 until 5) {
-                var conn: HttpURLConnection? = null
-                try {
-                    conn = openBoundConnection(network, postUrl, timeoutMs = 10000, acceptPortalCerts = true)
-                    applyCookies(conn, cookies)
-                    conn.setRequestProperty("Referer", referer)
-                    if (methodPost) {
-                        conn.requestMethod = "POST"
-                        conn.doOutput = true
-                        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                        OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(encodedBody) }
-                    }
-                    val code = conn.responseCode
-                    storeCookies(conn, cookies)
-                    finalPostUrl = postUrl
+                val resp = executeHttpHop(
+                    network = network,
+                    targetUrl = postUrl,
+                    timeoutMs = 10000,
+                    cookies = cookies,
+                    referer = referer,
+                    formBody = if (methodPost) encodedBody else null
+                )
+                postUrl = resp.effectiveUrl
+                finalPostUrl = resp.effectiveUrl
 
-                    val loc = conn.getHeaderField("Location")
-                    if (code in 300..399 && !loc.isNullOrBlank()) {
-                        val nextUrl = resolveUrl(postUrl, loc)
-                        if (nextUrl != null) {
-                            referer = postUrl.toString()
-                            postUrl = nextUrl
-                            methodPost = false
-                            continue
-                        }
+                val loc = resp.location
+                if (resp.code in 300..399 && !loc.isNullOrBlank()) {
+                    val nextUrl = resolveUrl(postUrl, loc)
+                    if (nextUrl != null) {
+                        referer = postUrl.toString()
+                        postUrl = nextUrl
+                        methodPost = false
+                        continue
                     }
-
-                    postBody = readBody(conn)
-                    break
-                } finally {
-                    conn?.disconnect()
                 }
+
+                postBody = resp.body
+                break
             }
         } catch (e: Exception) {
             return LoginResult(ok = false, portalUrl = currentUrl.toString(), message = "Login request failed: ${e.message}")
@@ -596,13 +626,9 @@ object WifiPortalClient {
     }
 
     fun logout(network: Network, logoutUrl: String) {
-        var conn: HttpURLConnection? = null
         try {
-            conn = openBoundConnection(network, URL(logoutUrl), timeoutMs = 4000, acceptPortalCerts = true)
-            conn.responseCode
+            executeHttpHop(network, URL(logoutUrl), timeoutMs = 4000, cookies = LinkedHashMap())
         } catch (_: Exception) {
-        } finally {
-            conn?.disconnect()
         }
     }
 }

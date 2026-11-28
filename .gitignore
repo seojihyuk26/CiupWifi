@@ -22,3 +22,12 @@ Thumbs.db
 # Temporary
 scratch/
 
+# Python
+__pycache__/
+*.pyc
+
+# Play Store signing secrets (NEVER commit)
+.play-secrets/
+*.jks
+*.keystore
+

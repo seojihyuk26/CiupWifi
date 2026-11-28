@@ -455,6 +455,11 @@ pub mod commands {
 
     #[tauri::command]
     pub async fn check_for_updates() -> Result<Option<UpdateInfo>, String> {
+        #[cfg(target_os = "android")]
+        {
+            return Ok(None);
+        }
+
         let current_version = env!("CARGO_PKG_VERSION");
         let client = Client::builder()
             .user_agent("CiupWifi-App")
@@ -520,13 +525,6 @@ pub mod commands {
                     break;
                 }
 
-                #[cfg(target_os = "android")]
-                if name.ends_with(".apk") {
-                    download_url = url.to_string();
-                    asset_name = name.to_string();
-                    break;
-                }
-
                 #[cfg(not(any(
                     target_os = "windows",
                     target_os = "macos",
@@ -561,6 +559,12 @@ pub mod commands {
         download_url: String,
         asset_name: String,
     ) -> Result<String, String> {
+        #[cfg(target_os = "android")]
+        {
+            let _ = (download_url, asset_name);
+            return Err("Updates on Android are managed by Google Play.".to_string());
+        }
+
         let client = Client::builder()
             .user_agent("CiupWifi-App")
             .timeout(std::time::Duration::from_secs(120))

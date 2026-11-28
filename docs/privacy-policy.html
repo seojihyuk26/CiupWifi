@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CiupWifi — Privacy Policy</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #090d16;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 32px 16px;
+      line-height: 1.65;
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      background: #111827;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 32px 28px;
+    }
+    h1, h2 { color: #f8fafc; }
+    h1 { margin-top: 0; font-size: 28px; }
+    h2 { font-size: 18px; margin-top: 28px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px; }
+    a { color: #818cf8; }
+    .notice {
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+    code {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Privacy Policy for CiupWifi</h1>
+    <p><strong>Effective Date:</strong> 2026-11-28 &nbsp;|&nbsp; <strong>Package:</strong> <code>org.ciup.wifi</code></p>
+    <div class="notice">
+      <strong>Unofficial Community Utility:</strong> CiupWifi is an independent open-source app built by a resident for Cité Internationale Universitaire de Paris (CIUP) residents. It is not affiliated with or endorsed by CIUP administration.
+    </div>
+
+    <h2>1. Data Collection &amp; Sharing</h2>
+    <p>CiupWifi does <strong>not</strong> operate developer servers, collect analytics, sell personal data, or share personal data with advertisers. Your campus credentials are transmitted only to the CIUP portal when authentication is required.</p>
+
+    <h2>2. Local Credential Storage</h2>
+    <p>Your campus username and password are saved strictly on your own device inside Android's private application sandbox (<code>SharedPreferences</code>). Credentials are sent directly from your device only to your local campus Wi-Fi captive portal gateway (e.g. <code>10.254.0.254</code>) to authenticate your internet session. The portal may use HTTP on the local campus network. Where HTTPS is used, the app relies on Android's system trust store and does not bypass certificate validation.</p>
+
+    <h2>3. Google Play Data Safety Disclosure</h2>
+    <p>For Google Play Data safety purposes, transmitting the campus account ID off-device to the CIUP portal is treated as collection for app functionality and account management. This credential is required to provide login automation. Credentials are not shared with the developer or unrelated third parties. Because a local portal can use HTTP, the app does not claim that all credential transmissions are encrypted in transit.</p>
+
+    <h2>4. Android Permissions</h2>
+    <ul>
+      <li><code>INTERNET</code> — Communicate with the local campus portal gateway and verify internet connectivity.</li>
+      <li><code>ACCESS_NETWORK_STATE</code> — Receive OS connectivity events when joining WifiCity without polling.</li>
+      <li><code>CHANGE_NETWORK_STATE</code> — Bind portal login traffic to the Wi-Fi network and report validated status to Android.</li>
+      <li><code>RECEIVE_BOOT_COMPLETED</code> — Re-arm low-power OS network triggers after reboot.</li>
+    </ul>
+    <p>No location, notification, camera, contacts, or storage permissions are requested.</p>
+
+    <h2>5. Data Deletion</h2>
+    <p>Uninstalling CiupWifi or clearing app data deletes all locally stored credentials immediately.</p>
+
+    <h2>6. Contact &amp; Source Code</h2>
+    <p>Source code &amp; support: <a href="https://github.com/seojihyuk26/CiupWifi">github.com/seojihyuk26/CiupWifi</a></p>
+  </main>
+</body>
+</html>
