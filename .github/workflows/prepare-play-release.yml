@@ -15,12 +15,10 @@ jobs:
         with:
           ref: main
 
-      - name: Write reviewed release files, commit, tag, and start release build
-        env:
-          GH_TOKEN: ${{ github.token }}
+
+      - name: Write release payload part 1
         run: |
-          set -euo pipefail
-          base64 --decode > /tmp/play-release-payload.zip <<'PLAY_RELEASE_PAYLOAD'
+          cat > /tmp/play-release-payload.b64 <<'PLAY_PART_00'
           UEsDBBQAAAAIAOcVfF0yGtVeywsAAEMmAAAdAAAALmdpdGh1Yi93b3JrZmxvd3MvcmVsZWFzZS55bWzVWtty2zYavvdT/Mt4Ylk1
           SNtxFFepMqFt2VHtWhrJqTfj9SgQCVKoSIAFQNlq4pm+Q3u/d/sI+0B9gn2EHfAgk9QhSSez0/VkYgvAf8D3HwGI4ZA0oU8CgiXZ
           2OCsuQEQxXKsfwMo7Mv0LwAEW9O6WTfrWxsAd1xMvIDfDV0qI6yccXNjIyIipFJSzhIahzNFmJJNuBNUkY2Nn/gomXgCf/z+6x+/
@@ -141,6 +139,11 @@ jobs:
           OcQIhaHsalA4V9n5eJwLV9TbKNHl2JL+TRRN/XF2Me5SGSz+z4F4jN3TLx6Hd2o8Dg/XeBz+lf4fUEsDBBQAAAAIANISfF3iOTHU
           hBEAAKAiAAAjAAAAcGxheS1zdG9yZS9QTEFZX1NUT1JFX1NVQk1JU1NJT04ubWSdWltzG0d2fsevOCXX2uAYAC+SHC9dlS2KF5kR
           TbIIcl1KKkU0ZhpAm4Pu2e4ekEipUrQNq2SRLtNZ0bqEVOhd2hI32gosU7t0VnlZ/hM/YgaVv5A63TO4SLLj5EEQMNOXc+/vfM3X
+          PLAY_PART_00
+
+      - name: Write release payload part 2
+        run: |
+          cat >> /tmp/play-release-payload.b64 <<'PLAY_PART_01'
           4KoQVZ/Csk+aMC24Ej6FYliuM6WY4HA1ZB6FH7bvwDQLg/dZhUG2JGS14LIwKGyyCiuNZDJTvg+aujXOXOJDLZSeTxVI+puQSepB
           uTm0TVYTWaW66G3AxbdgFKa4JwXzYPytHCzOXAM58XYOxt+Ca1dgdmEOAlKlQHxW5XXKdQ7qggstOHOh1KASpZwWHi3lwKOuTyTR
           rEGhxKneFHJjXVE3lEw3113BK6xa2Kr7pRz8E5UCSqsyVPo9wkmVyhKUmwFRiqrkLd3SVHLiw9TyNVDUr+TDwCOayhxQr0rzWuTx
@@ -261,6 +264,11 @@ jobs:
           GBSoJy3y0+el9ojJKQl1sGoU2HY5JWNlJdkX6sfrhXtVPTSdYRjilk32XAnbE1WgNzh2h+ppmmzdcWMw5VxOWDB+zz36rDnM1fy8
           v38YSHboMxIlXSG7+zTwKHL/gpXuA6xTrJjt7Vww74zJnU33Rrnp2YrVUTvmFZbDaRrQep3RaTWVaX/G6IyLRkdv7nTyBfd4ayak
           1TVA/WDQ07I7v7cN2P1NbMD49TZAFeWjcfMcZdZM3EOn3Uk+3GOkAaYKsJ09Sy/ecBo2BuSR1jKAZILjVZjLA7NtO40wGFfqqxWJ
+          PLAY_PART_01
+
+      - name: Write release payload part 3
+        run: |
+          cat >> /tmp/play-release-payload.b64 <<'PLAY_PART_02'
           0gCpIukF43RqS6NHaktq0akjR1pf2pYFZ5TImaCgN8qyctRf62+zOhJ7SJSkpXGDb0ryq5Rk3qvX22qBUSVO5rlPogiGxBtT4AH4
           dKRtv0uEt90A30aw0N5F4TGgmaIhSKi3Rjz4Yv8YjOcjZgOchnYCVmCNmi+foNtBHM922sgkp20hl9SfPqDUpfBcljHmAjRMZrGG
           RNt2RqJbXS3R9m57ie/LsqcpFOOE23nIxyhTc1xBwcYTvYSjWyYVKreasegF1SoDOuYUPlxWDGh3imoCKw3k3Ef7fsR9Tw9oNJgN
@@ -381,6 +389,11 @@ jobs:
           oINrsdzNyOdksVEaz+Ph+P5WvNEL3u34608sfX69LR/x/AGPuSyjWQZgKdB79YZdR63F2pjdqjGZThxjdOmMkLdFy+1kkMc4auJW
           /kfrK6bttneXm2emrXe4EAYJDZA5tDblSbNhbYZQw/sSg0WLXUqzPIFWbxVoutTRrFlXlDdepg6uiPngwcALc91e3ez89nb7yj35
           2IefugbfIamxOqgtsW7GQk2lY/DgvE9RQIZ1UjvrJJUM72KKy4RCvazWxeZfdc0pF9wOOpjp5w8HJSj3KuhgQEPbWuI+KpHRKIZN
+          PLAY_PART_02
+
+      - name: Write release payload part 4
+        run: |
+          cat >> /tmp/play-release-payload.b64 <<'PLAY_PART_03'
           qOEatSg4h7bKpbciQ1ArZUrhqM13m+uvrx+J91c3fLk9yH7U8rGdPd6KwaqoUoV7W+YIjUVro9yLm01qsxu5DVbqvgwgwxeaxoR9
           nTpTvt751f2LHFUdZ9+J1qBWnfpiC6kAVFQFqSKvZQzdh1VE9qHVEckBS9WorQeMNtfJQ/3rnW939uK6NM6+30BYiTqoQ8fAqB6d
           SmbYChGyRhtNPGK2MlwM2HGNUrxOxRmYl+WTBhyGJHD+eD0UR+VO2kZlj+bc2K3VQmUU0GiZo7BhPAlL5VKLrgVzDikckVmTU0f6
@@ -501,6 +514,11 @@ jobs:
           eWJq326vbx5rNIcX7x+K3m/WLPr2de8tr8iDmypilm1tVsmSXhOpa0jUQn2qivQSqYASLcoQhDobzuojda7fRAr7aP8JU3/3r7Ll
           nR2lCqT3UDPwJFTtJVvNgEuvrZVW2InnstXXHFnctTVn4SQiS/KZVmW0Lqc6xY+1mv0kAXW5Eb652VzbRvklRdf5QaClJWHJwjKV
           kJI3IYHPRSrXqrSHuVgHXNU6RbWZ1NwIQ5HXMD0lrPqkz+Lb/5/eAZ9aeAB1eJtbjmyK53cN+nIdFVryXJnqIFOYyRusJRkSa/Lr
+          PLAY_PART_03
+
+      - name: Write release payload part 5
+        run: |
+          cat >> /tmp/play-release-payload.b64 <<'PLAY_PART_04'
           Rut16kztxsyQWLEsx42hfLxqeeCJyy1/B9q8geNlf39+0S+fzPrnPeV9pGiqorVIVlIXGA2NhkOfEt6AWZMdf1VP1ujk3hsqM/OS
           mVE4EbU/1Sd8b5WalmK4k5b1WkuJlEDWMsQIdSk0nVEWWBVejM5tsFokYhJEE91x/Fb/lj6gJ4N6uEufnQ8RZ8tmyiY1JOu8k7Gg
           A826rIJitDUAW7MyMsXRtZvWatWwkZwC2vw4s3/WBHy5kb1y00tE0blRWwgRq2iycWb4WZIrvwTWMHGibDShVUSU+8oKykylCim9
@@ -621,6 +639,11 @@ jobs:
           aQ6CDoXm9OQkTF2YMBgMYe9cqfUJVmbvgDEKNimQspm4KMzWBkHMLn/8+eX7NrvbL67ujoxvl3cE0vg8wj/e6vcf0yP5H+WugvJl
           PDsljk75B37q5unx+Z6E9fmb205nxXOHus3T4nFoW8XFA1f6b3f86BcSkmcwqRfaure/u0/Sbs+mb1cXH8a3i0/+5OenqIHDC1ff
           Lh/Yas9e+fD96seTV5Nbc/1GQcAfHw6P47OTL8ZfFzd0v5jfY/zrIr5n5fbzk8Pvw78uxpVdzh9Hp+Xm4/84xOcPz/43ddUqKZAw
+          PLAY_PART_04
+
+      - name: Write release payload part 6
+        run: |
+          cat >> /tmp/play-release-payload.b64 <<'PLAY_PART_05'
           mHG5Zvk/QqVRzJ5hDR8q4Bo0NU2UwLI11htVOahp1deenWlXf3z5mMHK86fm4Tk42v+5Pz4cruBjcMmBiPE/T4mpL+yuk8U9/Pz9
           4vKRuv3pL794gd56+4lzlar3WIZIORWOIgxdYk7q7C101VSBmhOWMxTzUluhiokD6gl39rHA0/T9rToVV19uPt2eKxfzy7kJf3zE
           v17+8bc7E4mXqlpvW49DD/70/nvrU3j/JB/Ru968jGdiifdYxY6kaxQeQwJcRmNzZqzTsdEIs4FtOvV+0PMqAwfT7BA+Egyj58F6
@@ -741,6 +764,11 @@ jobs:
           /YmMzmlsKwlv2f36AZ3yNvRTtoEiSMpF5oAB7vslxw4tKiOqvWVjRB0L0D+JbarQxFD0TCEZKijDhAWe3QHEIWrzS5n3awJ2bYZz
           aTle/4jmbWeZdnBEtmF2yUBnFiPXWCZ21+3WaiwlEUmBS0kytwGXapHMMO26Nnj6Z5+YVXUJ5Yc5oLuNyYDuOZYqMWFI25vdW1J3
           Q328Gye0aeTS8/oa/SCIXOQb9CunjGToFzqjL6jaxEgQWa4IgkDjsY6H9b8rrGiK83xzMZQnIJ3uUk5gxwmsGMyGs1jgEvheQnwk
+          PLAY_PART_05
+
+      - name: Write release payload part 7
+        run: |
+          cat >> /tmp/play-release-payload.b64 <<'PLAY_PART_06'
           PoOwHdIo48GO5IQ6RvQFNakOatKhQQ0pBGUqZ5fB6N0LWhYgBu/Ra46AOhmyIKMZZAgRepMTLAniBWGoHoE4SwlSZhTa8FIgLTkR
           RN1tkG0yGFLs/2vFkiYeEKShjGOuPRQoNAUKPwWGhBnNyJ0ThbuRFeDUF10xE1y5yHkpXasdMqk4UYhKhHNBcLZBGFAjHSIekCMv
           jNptGVxRRhTR8Stne/AR+onP55A4gbpL9HEXRdFobGRSyzrDK1stqjCrWr1JmyEQr6Nwd+AYVR8KLOWai2wMMU3FrpqYdZzYJlsF
@@ -861,6 +889,11 @@ jobs:
           vdqxHRkNzLL7U+QD1G5Htzf5c49tWKeWO11stVR/74LZiXN/ht7p4lVU8qSvpXDuzYDWu2rNp3mx7Y9kkidHnuBFUZX1NkaM11vz
           rrywtmybHf6ksyPIL9sVKXcRZkWV/evHy/TQZV0j2/dcujvI+D3kHD4DquLM6yr8OVajzzouw7/vLlCv2UacwNuqSaoOWGP0MSPw
           zlV5nwTdsIo3+wPn6YAN4ktg3JsL3zfFE3mXDianj8PkHEdoiSkcs8rg1wSq9mWaFbtf/Sv/6FNpVgnPRaDO27RtweiqhL5DJ0hQ
+          PLAY_PART_06
+
+      - name: Write release payload part 8
+        run: |
+          cat >> /tmp/play-release-payload.b64 <<'PLAY_PART_07'
           1Kgi9+DpRevcyTm2c1Kc6/IYZlq3D/4PUEsDBBQAAAAIAIoBfF2SGIUwmAAAAP0AAAA9AAAAc3JjLXRhdXJpL2FuZHJvaWQtb3Zl
           cmxheS9yZXMveG1sL25ldHdvcmtfc2VjdXJpdHlfY29uZmlnLnhtbHWOMQ7CMAxF957Cyh4KG0PSXoGBCwTXgYg2kWwH2tsjFSQ6
           wPq+3tN3/TyN8CCWVLI3h93eAGUsQ8pXb6pGezR917hM+ix8t0JYOeliseSYrl0DAOAuQehDAEcKrDTrmUOMCU/EU1KlwRvlSuat
@@ -883,7 +916,14 @@ jobs:
           AADh4AAAc3JjLXRhdXJpL2FuZHJvaWQtb3ZlcmxheS9qYXZhL29yZy9jaXVwL3dpZmkvV2lmaVBvcnRhbENsaWVudC5rdFBLAQIU
           ABQAAAAIAIoBfF2SGIUwmAAAAP0AAAA9AAAAAAAAAAAAAAAAADD2AABzcmMtdGF1cmkvYW5kcm9pZC1vdmVybGF5L3Jlcy94bWwv
           bmV0d29ya19zZWN1cml0eV9jb25maWcueG1sUEsFBgAAAAASABIANwUAACP3AAAAAA==
-          PLAY_RELEASE_PAYLOAD
+          PLAY_PART_07
+
+      - name: Apply reviewed files, commit, tag, and start release build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          base64 --decode /tmp/play-release-payload.b64 > /tmp/play-release-payload.zip
           test "$(unzip -Z1 /tmp/play-release-payload.zip | wc -l)" -eq 18
           unzip -q /tmp/play-release-payload.zip -d .
           python3 -m py_compile scripts/apply_android_overlay.py
