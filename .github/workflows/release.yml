@@ -10,6 +10,11 @@ on:
         description: 'GitHub release tag to update (defaults to the selected ref)'
         required: false
         default: ''
+      skip_desktop:
+        description: 'Build Android only'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -20,6 +25,7 @@ env:
 jobs:
   # ── Desktop (Windows + macOS) ──────────────────────────────────────────────
   build-desktop:
+    if: ${{ !inputs.skip_desktop }}
     strategy:
       fail-fast: false
       matrix:
@@ -68,6 +74,7 @@ jobs:
   # ── Android (APK) ──────────────────────────────────────────────────────────
   build-android:
     needs: build-desktop
+    if: ${{ always() && (inputs.skip_desktop || needs.build-desktop.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -188,7 +195,8 @@ jobs:
               jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
                 -keystore release.keystore -storepass "$KS_PASS" -keypass "$KEY_PASS" \
                 "release-apks/CiupWifi.aab" "$KEY_ALIAS"
-              jarsigner -verify -strict "release-apks/CiupWifi.aab"
+              # Play upload keys are normally self-signed; strict PKIX validation is not applicable.
+              jarsigner -verify "release-apks/CiupWifi.aab"
             fi
 
             if [ -n "$APK_FILE" ]; then
