@@ -5,9 +5,17 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub release tag to update (defaults to the selected ref)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
 
 jobs:
   # ── Desktop (Windows + macOS) ──────────────────────────────────────────────
@@ -42,10 +50,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'CiupWifi ${{ github.ref_name }}'
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: 'CiupWifi ${{ env.RELEASE_TAG }}'
           releaseBody: |
-            ### 📶 CiupWifi Release ${{ github.ref_name }}
+            ### 📶 CiupWifi Release ${{ env.RELEASE_TAG }}
             Auto-login and session renewal app for CIUP Campus "WifiCity" network.
 
             #### 📦 Downloads & Instructions:
@@ -115,11 +123,7 @@ jobs:
           set -euo pipefail
           shopt -s globstar nullglob
           READELF="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
-          AAB_FILE=""
-          for f in src-tauri/gen/android/app/build/outputs/bundle/**/release/*.aab; do
-            AAB_FILE="$f"
-            break
-          done
+          AAB_FILE="$(find src-tauri/gen/android/app/build/outputs/bundle -type f -name '*.aab' | head -n 1)"
           if [ -z "$AAB_FILE" ]; then
             echo "ERROR: No release .aab found"
             exit 1
@@ -169,16 +173,8 @@ jobs:
           shopt -s globstar nullglob
           mkdir -p release-apks
 
-          APK_FILE=""
-          for f in src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk; do
-            APK_FILE="$f"
-            break
-          done
-          AAB_FILE=""
-          for f in src-tauri/gen/android/app/build/outputs/bundle/**/release/*.aab; do
-            AAB_FILE="$f"
-            break
-          done
+          APK_FILE="$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
+          AAB_FILE="$(find src-tauri/gen/android/app/build/outputs/bundle -type f -name '*.aab' | head -n 1)"
 
           if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
             echo "Using persistent upload keystore from secrets"
@@ -225,7 +221,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release-apks/*
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
