@@ -53,7 +53,7 @@ jobs:
             - **macOS**: `CiupWifi_*_universal.dmg` (Gatekeeper: System Settings -> Privacy & Security -> Open Anyway)
             - **Android**: `CiupWifi.apk`
             - **iOS / iPadOS / Web**: [Greasy Fork Userscript](https://greasyfork.org/fr/scripts/488569-cite-university-wifi-auto-login-script)
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
 
@@ -80,10 +80,10 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
-          echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/build-tools/36.0.0" >> $GITHUB_PATH
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.0.12077973" "build-tools;34.0.0" "platforms;android-34"
-          echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;28.2.13676358" "build-tools;36.0.0" "platforms;android-36"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
 
       - name: Setup Rust + Android targets
         uses: dtolnay/rust-toolchain@stable
@@ -105,29 +105,140 @@ jobs:
       - name: Apply Custom App Icons to Android
         run: cp -rf src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
 
-      - name: Build Android APK
-        run: npx tauri android build --apk
-
-      - name: Sign APK
+      - name: Build Android AAB & APK
         run: |
-          keytool -genkeypair -v -keystore release.keystore -alias ciupwifi -keyalg RSA -keysize 2048 -validity 10000 -storepass ciupwifipass -keypass ciupwifipass -dname "CN=CiupWifi, O=CIUP, C=FR"
-          mkdir -p release-apks
+          npx tauri android build --aab
+          npx tauri android build --apk
+
+      - name: Verify 16 KB ELF Page Alignment
+        run: |
+          set -euo pipefail
           shopt -s globstar nullglob
-          for apk in src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk; do
-            if [ -f "$apk" ]; then
-              $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:ciupwifipass --key-pass pass:ciupwifipass --out "release-apks/CiupWifi.apk" "$apk"
-              break
-            fi
+          READELF="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          AAB_FILE=""
+          for f in src-tauri/gen/android/app/build/outputs/bundle/**/release/*.aab; do
+            AAB_FILE="$f"
+            break
           done
+          if [ -z "$AAB_FILE" ]; then
+            echo "ERROR: No release .aab found"
+            exit 1
+          fi
+          echo "Inspecting AAB: $AAB_FILE"
+          rm -rf /tmp/aab-align-check && mkdir -p /tmp/aab-align-check
+          unzip -q "$AAB_FILE" "base/lib/arm64-v8a/*.so" "base/lib/x86_64/*.so" -d /tmp/aab-align-check || true
+          SO_FILES=(/tmp/aab-align-check/base/lib/*/*.so)
+          if [ ${#SO_FILES[@]} -eq 0 ]; then
+            echo "ERROR: No 64-bit .so libraries found inside AAB"
+            exit 1
+          fi
+          python3 - "$READELF" "${SO_FILES[@]}" <<'PY'
+          import re
+          import subprocess
+          import sys
+
+          readelf = sys.argv[1]
+          failed = False
+          for so in sys.argv[2:]:
+              out = subprocess.check_output([readelf, "-W", "-l", so], text=True)
+              load_aligns = []
+              for line in out.splitlines():
+                  if line.strip().startswith("LOAD"):
+                      m = re.findall(r"0x[0-9a-fA-F]+", line)
+                      if m:
+                          load_aligns.append(int(m[-1], 16))
+              bad = [a for a in load_aligns if a < 16384]
+              print(f"{so}: LOAD aligns={[hex(a) for a in load_aligns]}")
+              if not load_aligns or bad:
+                  print(f"FAIL: {so} has < 16KB LOAD alignment: {[hex(a) for a in bad]}")
+                  failed = True
+          if failed:
+              sys.exit(1)
+          print("ALL 64-BIT .SO LIBRARIES ARE >= 16 KB PAGE-ALIGNED")
+          PY
+
+      - name: Sign Android AAB & APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          mkdir -p release-apks
+
+          APK_FILE=""
+          for f in src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk; do
+            APK_FILE="$f"
+            break
+          done
+          AAB_FILE=""
+          for f in src-tauri/gen/android/app/build/outputs/bundle/**/release/*.aab; do
+            AAB_FILE="$f"
+            break
+          done
+
+          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "Using persistent upload keystore from secrets"
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > release.keystore
+            KS_PASS="${ANDROID_KEYSTORE_PASSWORD}"
+            KEY_PASS="${ANDROID_KEY_PASSWORD:-$KS_PASS}"
+            KEY_ALIAS="${ANDROID_KEY_ALIAS:-ciupwifi-upload}"
+
+            if [ -n "$AAB_FILE" ]; then
+              cp "$AAB_FILE" "release-apks/CiupWifi.aab"
+              jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+                -keystore release.keystore -storepass "$KS_PASS" -keypass "$KEY_PASS" \
+                "release-apks/CiupWifi.aab" "$KEY_ALIAS"
+              jarsigner -verify -strict "release-apks/CiupWifi.aab"
+            fi
+
+            if [ -n "$APK_FILE" ]; then
+              $ANDROID_HOME/build-tools/36.0.0/apksigner sign \
+                --ks release.keystore --ks-key-alias "$KEY_ALIAS" \
+                --ks-pass "pass:$KS_PASS" --key-pass "pass:$KEY_PASS" \
+                --out "release-apks/CiupWifi.apk" "$APK_FILE"
+            fi
+            echo "HAS_PLAY_KEYSTORE=true" >> $GITHUB_ENV
+          else
+            echo "WARNING: ANDROID_KEYSTORE_BASE64 not set; signing APK with ephemeral key and keeping AAB unsigned"
+            keytool -genkeypair -v -keystore release.keystore -alias ciupwifi -keyalg RSA -keysize 2048 -validity 10000 -storepass ciupwifipass -keypass ciupwifipass -dname "CN=CiupWifi, O=CIUP, C=FR"
+            if [ -n "$APK_FILE" ]; then
+              $ANDROID_HOME/build-tools/36.0.0/apksigner sign --ks release.keystore --ks-pass pass:ciupwifipass --key-pass pass:ciupwifipass --out "release-apks/CiupWifi.apk" "$APK_FILE"
+            fi
+            if [ -n "$AAB_FILE" ]; then
+              cp "$AAB_FILE" "release-apks/CiupWifi-unsigned.aab"
+            fi
+            echo "HAS_PLAY_KEYSTORE=false" >> $GITHUB_ENV
+          fi
+
+          if [ -n "${PLAY_SERVICE_ACCOUNT_JSON:-}" ]; then
+            echo "HAS_PLAY_SA=true" >> $GITHUB_ENV
+          else
+            echo "HAS_PLAY_SA=false" >> $GITHUB_ENV
+          fi
           ls -lh release-apks/
 
-      - name: Upload APK to Release
+      - name: Upload APK & AAB to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-apks/CiupWifi.apk
+          files: release-apks/*
           tag_name: ${{ github.ref_name }}
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload AAB to Google Play (Internal Track)
+        if: ${{ env.HAS_PLAY_KEYSTORE == 'true' && env.HAS_PLAY_SA == 'true' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.ciup.wifi
+          releaseFiles: release-apks/CiupWifi.aab
+          track: internal
+          status: completed
 
       - name: Trigger Greasy Fork Sync
         if: env.GREASYFORK_WEBHOOK_URL != ''
