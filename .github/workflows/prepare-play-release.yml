@@ -926,12 +926,12 @@ jobs:
           base64 --decode /tmp/play-release-payload.b64 > /tmp/play-release-payload.zip
           test "$(unzip -Z1 /tmp/play-release-payload.zip | wc -l)" -eq 18
           unzip -oq /tmp/play-release-payload.zip -d .
+          git restore --source=HEAD -- .github/workflows/release.yml
           python3 -m py_compile scripts/apply_android_overlay.py
           python3 -m json.tool package.json > /dev/null
           python3 -m json.tool package-lock.json > /dev/null
           python3 -m json.tool src-tauri/tauri.conf.json > /dev/null
           rm -rf scripts/__pycache__
-          git rm --quiet .github/workflows/prepare-play-release.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
