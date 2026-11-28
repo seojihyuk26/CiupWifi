@@ -925,7 +925,7 @@ jobs:
           set -euo pipefail
           base64 --decode /tmp/play-release-payload.b64 > /tmp/play-release-payload.zip
           test "$(unzip -Z1 /tmp/play-release-payload.zip | wc -l)" -eq 18
-          unzip -q /tmp/play-release-payload.zip -d .
+          unzip -oq /tmp/play-release-payload.zip -d .
           python3 -m py_compile scripts/apply_android_overlay.py
           python3 -m json.tool package.json > /dev/null
           python3 -m json.tool package-lock.json > /dev/null
